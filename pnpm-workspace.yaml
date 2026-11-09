@@ -1,0 +1,5 @@
+allowBuilds:
+  sharp: false
+  unrs-resolver: false
+  # esbuild's install script only checks for its platform binary (used by tsx and drizzle-kit).
+  esbuild: true
