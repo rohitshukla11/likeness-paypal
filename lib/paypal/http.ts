@@ -114,3 +114,23 @@ export function money(value: number | string, currency = "USD") {
   if (!/^\d+(\.\d{1,2})?$/.test(v)) throw new Error(`not an amount: ${v}`);
   return { currency_code: currency, value: v };
 }
+
+/**
+ * A browser-safe client token for the JS SDK v6 (`response_type=client_token`): short-lived, scoped to the SDK, safe
+ * to send to the page. Never the server's access token.
+ */
+export async function browserClientToken(config: PayPalConfig = paypalConfig()): Promise<{ accessToken: string; expiresIn: number }> {
+  const res = await fetch(`${config.baseUrl}/v1/oauth2/token`, {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${Buffer.from(`${config.clientId}:${config.clientSecret}`).toString("base64")}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: "grant_type=client_credentials&response_type=client_token&intent=sdk_init",
+  });
+  const body = (await res.json().catch(() => ({}))) as { access_token?: string; expires_in?: number; error?: string; error_description?: string };
+  if (!res.ok || !body.access_token) {
+    throw new PayPalError(res.status, body.error ?? "OAUTH_ERROR", body.error_description ?? "client token request failed", res.headers.get("paypal-debug-id") ?? undefined, []);
+  }
+  return { accessToken: body.access_token, expiresIn: body.expires_in ?? 0 };
+}
