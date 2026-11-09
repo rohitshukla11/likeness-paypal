@@ -1,105 +1,121 @@
 import "server-only";
-/** Licence requests, the creator's decision, licences and revocation. */
-import { randomBytes } from "node:crypto";
-import { autoApproves, licenceStatus, withVideoDefaults, type LicenceDoc, type RequestDoc } from "@/lib/model";
-import { getBrand } from "./accounts";
-import { getCreator } from "./creators";
-import { firestore } from "./firebase-admin";
-import { HttpError } from "./http";
+/**
+ * Licence requests, the creator's decision, licences and revocation, in Postgres (Drizzle). A request is a licence
+ * row in status pending; the creator approves it (active, with expires_at and the terms' sha256 fixed then) or
+ * declines it. Each decision and each revocation is one transaction holding the licence row (SELECT … FOR UPDATE),
+ * so a revocation and a render's policy check can't interleave: a revoked licence refuses every later render.
+ */
+import { and, desc, eq } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
+import { canonicalJson, sha256Hex } from "./canonical";
+import { db } from "./db";
+import { BANNED_USES, brands, creators, licences } from "./db/schema";
+import { HttpError, newId } from "./errors";
 
-const db = () => firestore();
-const newId = () => randomBytes(12).toString("base64url");
+export type Licence = typeof licences.$inferSelect;
+/** What a licence is now: its stored status, or expired / used up when time or renders have run out. */
+export type LicenceState = "pending" | "active" | "declined" | "revoked" | "expired" | "exhausted";
 
-export async function fileRequest(brandUid: string, input: { creatorId: string; use: string; days: number; maxRenders: number; brief: string }): Promise<RequestDoc> {
-  const brand = await getBrand(brandUid);
-  if (!brand) throw new HttpError(409, "set up your brand profile first");
-  const c = await getCreator(input.creatorId);
-  if (!c || c.status !== "live" || !c.listed || !c.terms) throw new HttpError(404, "this creator isn't accepting licences");
-  if (c.uid === brandUid) throw new HttpError(400, "you can't license your own likeness");
-  if (!c.terms.uses.includes(input.use)) throw new HttpError(400, "this creator doesn't allow that use");
+export function licenceState(l: Pick<Licence, "status" | "expiresAt" | "rendersUsed" | "renderCap" | "revokedAt">, now = new Date()): LicenceState {
+  if (l.revokedAt || l.status === "revoked") return "revoked";
+  if (l.status !== "active") return l.status as LicenceState;
+  if (!l.expiresAt || now >= l.expiresAt) return "expired";
+  if (l.rendersUsed >= l.renderCap) return "exhausted";
+  return "active";
+}
+
+/** The terms a licence fixes when approved; their sha256 goes on every receipt. */
+export function licenceTerms(l: Pick<Licence, "id" | "creatorId" | "brandId" | "pricePerRenderCents" | "videoMultiplier" | "allowedUses" | "bannedUses" | "renderCap" | "expiresAt">) {
+  return {
+    licenceId: l.id,
+    creatorId: l.creatorId,
+    brandId: l.brandId,
+    pricePerRenderCents: l.pricePerRenderCents,
+    videoMultiplier: l.videoMultiplier,
+    allowedUses: [...l.allowedUses].sort(),
+    bannedUses: [...l.bannedUses].sort(),
+    renderCap: l.renderCap,
+    expiresAt: l.expiresAt?.toISOString() ?? null,
+  };
+}
+
+export async function fileRequest(brandId: string, input: { creatorId: string; uses: string[]; days: number; renderCap: number; brief: string }): Promise<Licence> {
+  const [brand] = await db().select().from(brands).where(eq(brands.id, brandId));
+  if (!brand) throw new HttpError(409, "set up your brand first");
+  const [c] = await db().select().from(creators).where(eq(creators.id, input.creatorId));
+  if (!c || !c.acceptingLicences || c.workspaceId !== brand.workspaceId) throw new HttpError(404, "this creator isn't accepting licences");
+  const uses = [...new Set((input.uses ?? []).map(String))];
+  if (!uses.length) throw new HttpError(400, "choose at least one use");
+  const banned = uses.filter((u) => (BANNED_USES as readonly string[]).includes(u));
+  if (banned.length) throw new HttpError(400, `never allowed: ${banned.join(", ")}`);
+  const outside = uses.filter((u) => !c.allowedUses.includes(u));
+  if (outside.length) throw new HttpError(400, `this creator doesn't allow: ${outside.join(", ")}`);
   const days = Math.floor(Number(input.days));
-  if (!(days >= 1 && days <= c.terms.maxDays)) throw new HttpError(400, `duration must be 1 to ${c.terms.maxDays} days`);
-  const maxRenders = Math.floor(Number(input.maxRenders));
-  if (!(maxRenders >= 1 && maxRenders <= c.terms.maxRendersPerLicence)) throw new HttpError(400, `renders must be 1 to ${c.terms.maxRendersPerLicence}`);
+  if (!(days >= 1 && days <= c.maxDays)) throw new HttpError(400, `duration must be 1 to ${c.maxDays} days`);
+  const renderCap = Math.floor(Number(input.renderCap));
+  if (!(renderCap >= 1 && renderCap <= c.maxRendersPerLicence)) throw new HttpError(400, `renders must be 1 to ${c.maxRendersPerLicence}`);
   const brief = String(input.brief ?? "").trim();
   if (brief.length < 10 || brief.length > 600) throw new HttpError(400, "describe the campaign in 10 to 600 characters");
-  const r: RequestDoc = { id: newId(), brandId: brandUid, brandName: brand.name, creatorId: c.uid, use: input.use, days, maxRenders, brief, state: "pending", createdAt: Date.now() };
-  await db().collection("requests").doc(r.id).set(r);
-  // A synthetic demo creator approves at once; the terms were checked above, like any request.
-  if (autoApproves(c)) return (await decide(c.uid, r.id, true, { auto: true })).request;
-  return r;
+  const [l] = await db()
+    .insert(licences)
+    .values({ id: newId("lic"), creatorId: c.id, brandId, pricePerRenderCents: c.pricePerRenderCents, videoMultiplier: c.videoMultiplier, allowedUses: uses, bannedUses: [...BANNED_USES], renderCap, days, brief, status: "pending" })
+    .returning();
+  return l;
 }
 
-export async function decide(creatorUid: string, requestId: string, approve: boolean, opts: { auto?: boolean } = {}): Promise<{ request: RequestDoc; licence?: LicenceDoc }> {
-  return db().runTransaction(async (tx) => {
-    const ref = db().collection("requests").doc(requestId);
-    const s = await tx.get(ref);
-    if (!s.exists) throw new HttpError(404, "no such request");
-    const r = s.data() as RequestDoc;
-    if (r.creatorId !== creatorUid) throw new HttpError(403, "only the creator can decide this request");
-    if (r.state !== "pending") throw new HttpError(409, `request already ${r.state}`);
-    const cs = await tx.get(db().collection("creators").doc(creatorUid));
-    const c = cs.data() as { displayName: string; terms?: { pricePerImage: number; pricePerVideo: number; videoAllowed?: boolean; maxVideosPerLicence?: number } } | undefined;
+/** The creator approves (price and video multiplier from their terms now) or declines a pending request. */
+export async function decide(creatorId: string, licenceId: string, approve: boolean, now = new Date()): Promise<Licence> {
+  return db().transaction(async (tx) => {
+    const [l] = await tx.select().from(licences).where(eq(licences.id, licenceId)).for("update");
+    if (!l) throw new HttpError(404, "no such request");
+    if (l.creatorId !== creatorId) throw new HttpError(403, "only the creator can decide this request");
+    if (l.status !== "pending") throw new HttpError(409, `request already ${l.status}`);
     if (!approve) {
-      tx.update(ref, { state: "declined", decidedAt: Date.now() });
-      return { request: { ...r, state: "declined" as const } };
+      const [d] = await tx.update(licences).set({ status: "declined", declinedAt: now }).where(eq(licences.id, licenceId)).returning();
+      return d;
     }
-    if (!c?.terms) throw new HttpError(409, "set your terms first");
-    const now = Date.now();
-    const licence: LicenceDoc = {
-      id: newId(),
-      requestId,
-      brandId: r.brandId,
-      brandName: r.brandName,
-      creatorId: creatorUid,
-      creatorName: c.displayName,
-      use: r.use,
-      start: now,
-      end: now + r.days * 86_400_000,
-      maxRenders: r.maxRenders,
-      renderCount: 0,
-      pricePerImage: c.terms.pricePerImage,
-      pricePerVideo: c.terms.pricePerVideo,
-      videoAllowed: c.terms.videoAllowed ?? true,
-      maxVideos: Math.min(c.terms.maxVideosPerLicence ?? 3, r.maxRenders),
-      videoCount: 0,
-      createdAt: now,
-      ...(opts.auto ? { autoApproved: true } : {}),
-    };
-    tx.create(db().collection("licences").doc(licence.id), licence);
-    tx.update(ref, { state: "approved", decidedAt: now, licenceId: licence.id, ...(opts.auto ? { autoApproved: true } : {}) });
-    return { request: { ...r, state: "approved" as const, licenceId: licence.id, ...(opts.auto ? { autoApproved: true } : {}) }, licence };
+    const [c] = await tx.select().from(creators).where(eq(creators.id, creatorId));
+    if (!c) throw new HttpError(409, "set your terms first");
+    const expiresAt = new Date(now.getTime() + l.days * 86_400_000);
+    const fixed = { ...l, pricePerRenderCents: c.pricePerRenderCents, videoMultiplier: c.videoMultiplier, expiresAt };
+    const [a] = await tx
+      .update(licences)
+      .set({ status: "active", approvedAt: now, expiresAt, pricePerRenderCents: fixed.pricePerRenderCents, videoMultiplier: fixed.videoMultiplier, termsSha256: sha256Hex(canonicalJson(licenceTerms(fixed))) })
+      .where(eq(licences.id, licenceId))
+      .returning();
+    return a;
   });
 }
 
-export async function revoke(creatorUid: string, licenceId: string): Promise<LicenceDoc> {
-  return db().runTransaction(async (tx) => {
-    const ref = db().collection("licences").doc(licenceId);
-    const s = await tx.get(ref);
-    if (!s.exists) throw new HttpError(404, "no such licence");
-    const l = s.data() as LicenceDoc;
-    if (l.creatorId !== creatorUid) throw new HttpError(403, "only the creator can revoke this licence");
+/** Revokes a licence at once. Renders already settled keep their receipts ("licensed when made"); new ones are refused. */
+export async function revoke(creatorId: string, licenceId: string, now = new Date()): Promise<Licence> {
+  return db().transaction(async (tx) => {
+    const [l] = await tx.select().from(licences).where(eq(licences.id, licenceId)).for("update");
+    if (!l) throw new HttpError(404, "no such licence");
+    if (l.creatorId !== creatorId) throw new HttpError(403, "only the creator can revoke this licence");
     if (l.revokedAt) return l;
-    const revokedAt = Date.now();
-    tx.update(ref, { revokedAt });
-    tx.create(db().collection("revocations").doc(), { licenceId, creatorId: creatorUid, brandId: l.brandId, at: revokedAt });
-    return { ...l, revokedAt };
+    if (l.status !== "active" && l.status !== "expired") throw new HttpError(409, `a ${l.status} licence can't be revoked`);
+    const [r] = await tx.update(licences).set({ status: "revoked", revokedAt: now }).where(and(eq(licences.id, licenceId), eq(licences.creatorId, creatorId))).returning();
+    return r;
   });
 }
 
-export async function getLicence(id: string): Promise<LicenceDoc | null> {
-  const s = await db().collection("licences").doc(id).get();
-  return s.exists ? withVideoDefaults(s.data() as LicenceDoc) : null;
+export async function getLicence(id: string): Promise<Licence | null> {
+  const [l] = await db().select().from(licences).where(eq(licences.id, id));
+  return l ?? null;
 }
 
-const withStatus = (l: LicenceDoc) => ({ ...withVideoDefaults(l), status: licenceStatus(l) });
-
-export async function listFor(field: "creatorId" | "brandId", uid: string) {
-  // Equality filter only, sorted here: no composite index needed on a fresh database.
-  const [req, lic] = await Promise.all([db().collection("requests").where(field, "==", uid).limit(200).get(), db().collection("licences").where(field, "==", uid).limit(200).get()]);
-  const newest = <T extends { createdAt: number }>(a: T, b: T) => b.createdAt - a.createdAt;
-  return {
-    requests: req.docs.map((d) => d.data() as RequestDoc).sort(newest),
-    licences: lic.docs.map((d) => withStatus(d.data() as LicenceDoc)).sort(newest),
-  };
+/** A creator's or a brand's licences (and requests), newest first, with both names and the current state. */
+export async function listFor(field: "creatorId" | "brandId", id: string) {
+  const b = alias(brands, "b");
+  const c = alias(creators, "c");
+  const rows = await db()
+    .select({ licence: licences, brandName: b.name, creatorName: c.name, creatorPhoto: c.photoRef })
+    .from(licences)
+    .innerJoin(b, eq(b.id, licences.brandId))
+    .innerJoin(c, eq(c.id, licences.creatorId))
+    .where(eq(licences[field], id))
+    .orderBy(desc(licences.createdAt))
+    .limit(200);
+  return rows.map((r) => ({ ...r.licence, brandName: r.brandName, creatorName: r.creatorName, creatorPhoto: r.creatorPhoto, state: licenceState(r.licence) }));
 }
