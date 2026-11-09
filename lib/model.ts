@@ -1,5 +1,7 @@
 /**
- * The data model, shared by server and browser. Stored in Firestore (database FIRESTORE_DATABASE):
+ * The data model, shared by server and browser. In likeness-ai these were Firestore documents (below); here they
+ * become Postgres tables (lib/db/schema.ts) and prices move from demo credits to PayPal amounts in cents, as the
+ * payment flow is built. The original layout, for reference:
  *   users/{uid}           role, name, email
  *   creators/{uid}        channel, face match, consent, terms, listing, wrapped data key
  *   brands/{uid}          brand name and website
@@ -10,8 +12,6 @@
  *   decryptions/{id}      every time the render service opened a creator's photos
  * Prices are in demo credits (1 credit = US$0.01, not real money).
  */
-import { CATEGORIES } from "./categories";
-
 export type Role = "creator" | "brand";
 
 export type Channel = {
@@ -136,8 +136,6 @@ export function licenceStatus(l: Pick<LicenceDoc, "revokedAt" | "end" | "renderC
   if (l.renderCount >= l.maxRenders) return "Exhausted";
   return "Active";
 }
-
-export const useLabel = (key: string) => CATEGORIES.find((c) => c.key === key)?.label ?? key;
 
 export function creatorFee(price: number): { creator: number; fee: number } {
   const fee = Math.floor((price * FEE_PERCENT) / 100);
