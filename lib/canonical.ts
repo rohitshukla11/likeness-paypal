@@ -1,10 +1,10 @@
 import { createHash } from "node:crypto";
 
 /**
- * HSP's Canonical JSON (docs: cart-mandate.md, "Canonical JSON"; Node SDK crypto/canonical-json.ts):
- * object keys sorted recursively, compact, `undefined` members dropped. For the JSON values we send
- * (strings, integers, booleans, arrays, objects) this is the RFC 8785 serialisation: JavaScript's
- * default sort compares UTF-16 code units, and JSON.stringify writes numbers as ECMAScript does.
+ * Canonical JSON: object keys sorted recursively, compact, `undefined` members dropped. For the JSON values we hash
+ * (strings, integers, booleans, arrays, objects) this is the RFC 8785 serialisation: JavaScript's default sort
+ * compares UTF-16 code units, and JSON.stringify writes numbers as ECMAScript does. Used here to hash licence and
+ * mandate terms and receipt payloads, so the same terms always give the same sha256.
  */
 export function canonicalJson(value: unknown): string {
   return JSON.stringify(sortKeys(value));
