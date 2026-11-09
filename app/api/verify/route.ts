@@ -1,18 +1,22 @@
-import { HttpError } from "@/lib/server/http";
-import { route } from "@/lib/server/route";
-import { verifyFile, verifyHash } from "@/lib/server/verify";
+import { createHash } from "node:crypto";
+import { verifyHash, verifyReceipt } from "@/lib/verify";
 
-export const maxDuration = 60;
-
-/** Anyone can check a file: multipart field "file". Nothing is stored. */
-export const POST = route(async (req) => {
+/** Anyone can check a file: multipart field "file". It is hashed and dropped; nothing is stored. */
+export async function POST(req: Request) {
   const form = await req.formData().catch(() => null);
   const file = form?.get("file");
-  if (!(file instanceof File)) throw new HttpError(400, "attach a file");
-  if (file.size > 60 * 1024 * 1024) throw new HttpError(413, "file is larger than 60 MB");
-  const mime = file.type || (file.name.endsWith(".mp4") ? "video/mp4" : file.name.endsWith(".png") ? "image/png" : "image/jpeg");
-  return verifyFile(new Uint8Array(await file.arrayBuffer()), mime);
-});
+  if (!(file instanceof File)) return Response.json({ error: "attach a file" }, { status: 400 });
+  if (file.size > 60 * 1024 * 1024) return Response.json({ error: "file is larger than 60 MB" }, { status: 413 });
+  const sha = createHash("sha256").update(new Uint8Array(await file.arrayBuffer())).digest("hex");
+  return Response.json(await verifyHash(sha));
+}
 
-/** Check a render by its receipt key: GET /api/verify?sha=<sha256 of the file>. */
-export const GET = route(async (req) => verifyHash(String(new URL(req.url).searchParams.get("sha") ?? "")));
+/** GET /api/verify?receipt=<receipt id> or ?sha=<sha256 of the delivered file>. */
+export async function GET(req: Request) {
+  const q = new URL(req.url).searchParams;
+  const receipt = q.get("receipt");
+  if (receipt) return Response.json(await verifyReceipt(receipt));
+  const sha = q.get("sha");
+  if (sha) return Response.json(await verifyHash(sha));
+  return Response.json({ error: "pass ?receipt= or ?sha=" }, { status: 400 });
+}

@@ -1,282 +1,116 @@
 "use client";
 
 /**
- * Verify: anyone drops a file (hashed in the browser, never uploaded) or pastes its sha256, and sees
- * Licensed, Revoked ("licensed when made, since revoked"), Expired or Unknown, with the creator, the
- * licensee, the HSP payment and the receipt on chain behind the answer.
+ * Verify: anyone drops a file (hashed in the browser, never uploaded), pastes its sha256 or a receipt id, and sees
+ * Licensed, Revoked ("licensed when made, since revoked"), Expired, Refunded or Unknown, with the creator, the
+ * licensee, the PayPal capture and payout or refund behind the answer, and the receipt's Ed25519 signature check.
  */
-import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { Suspense, useCallback, useEffect, useState } from "react";
-import { AppPage, btnClass, CreatorFace, ErrorCard } from "@/components/ds";
-import { IconCheck, IconCross, IconQuestion, IconUpload } from "@/components/ds/icons";
-import { Addr, fmtDate, fmtDay, inputClass, Tx } from "@/components/ui";
-import { api, sha256Hex, type CreatorView, type Verdict } from "@/lib/api";
-import { displayOf } from "@/lib/demo";
-import { chainLabel, tokenOf } from "@/lib/chain";
-import { useAppState } from "@/components/site/AppState";
+import { useState } from "react";
+import type { VerifyResult } from "@/lib/verify";
+import { Result } from "./result";
 
-const LOOK = {
-  Licensed: { bg: "bg-lime", stroke: "#DCF37B", stamp: "Licensed", icon: IconCheck },
-  Revoked: { bg: "bg-coral", stroke: "#F7A4A1", stamp: "Licensed when made, since revoked", icon: IconCross },
-  Expired: { bg: "bg-[#D9DCE2]", stroke: "#D9DCE2", stamp: "Expired", icon: IconQuestion },
-  Unknown: { bg: "bg-[#D9DCE2]", stroke: "#D9DCE2", stamp: "Unknown", icon: IconQuestion },
-} as const;
+const inputClass = "w-full min-w-0 rounded-xl border border-line bg-white px-3 py-2 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20";
 
-export default function VerifyPage() {
-  return (
-    <Suspense>
-      <Verify />
-    </Suspense>
-  );
+async function sha256Hex(f: File) {
+  const d = await crypto.subtle.digest("SHA-256", await f.arrayBuffer());
+  return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-function Verify() {
-  const params = useSearchParams();
-  const [hash, setHash] = useState(params.get("hash") ?? "");
-  const [checked, setChecked] = useState<string | null>(null);
-  const [result, setResult] = useState<Verdict | null>(null);
-  const { state } = useAppState();
-  // The chain of the receipt (Sepolia, or HSK testnet for files made before the move), else the server's.
-  const chain = chainLabel(result?.chainId ?? state?.chainId);
+export default function VerifyPage() {
+  const [query, setQuery] = useState("");
+  const [result, setResult] = useState<VerifyResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [file, setFile] = useState<{ url: string; size: number; type: string } | null>(null);
-  const [who, setWho] = useState<ReturnType<typeof displayOf> | null>(null);
+  const [file, setFile] = useState<{ url: string; name: string; sha: string } | null>(null);
 
-  const byHash = useCallback(async (h: string) => {
+  async function lookUp(q: string) {
+    const v = q.trim();
+    if (!v) return;
     setBusy(true);
     setError(null);
     setResult(null);
     try {
-      setChecked(h.trim());
-      setResult(await api<Verdict>(`/api/verify?hash=${h.trim()}`));
+      const param = v.startsWith("rcp_") ? `receipt=${encodeURIComponent(v)}` : `sha=${encodeURIComponent(v)}`;
+      const res = await fetch(`/api/verify?${param}`, { cache: "no-store" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
+      setResult(json as VerifyResult);
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setBusy(false);
     }
-  }, []);
-  useEffect(() => {
-    const h = params.get("hash");
-    if (h) void byHash(h);
-  }, [params, byHash]);
+  }
 
   async function onFile(f: File | undefined) {
     if (!f) return;
-    setFile({ url: URL.createObjectURL(f), size: f.size, type: f.type || "file" });
-    const h = await sha256Hex(f);
-    setHash(h);
-    await byHash(h);
+    const sha = await sha256Hex(f);
+    setFile({ url: URL.createObjectURL(f), name: f.name, sha });
+    setQuery(sha);
+    await lookUp(sha);
   }
 
-  // The creator behind a receipt: Ana Reyes (synthetic) or a registered, YouTube-verified creator.
-  useEffect(() => {
-    setWho(null);
-    if (result?.creator) api<CreatorView>(`/api/creators/${result.creator}`).then((c) => setWho(displayOf(c)), () => setWho(null));
-  }, [result?.creator]);
-
-  const look = result ? LOOK[result.verdict] : null;
-  const Icon = look?.icon ?? IconUpload;
-  const known = result && result.verdict !== "Unknown";
-
   return (
-    <AppPage title="Verify a file" description="Check whether the person in an image licensed it. Anyone can use this; no account, no password.">
-      <div className="grid grid-cols-1 items-start gap-[18px] desk:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
-        <div className="flex min-w-0 flex-col gap-[14px]">
+    <div className="flex flex-col gap-5">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Verify an ad</h1>
+        <p className="mt-1 max-w-2xl text-sm text-muted">Was the person in this ad paid and did they license it? Anyone can check; no account needed.</p>
+      </div>
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)]">
+        <div className="flex min-w-0 flex-col gap-3">
           <label
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => {
               e.preventDefault();
               void onFile(e.dataTransfer.files[0]);
             }}
-            className="flex min-h-16 cursor-pointer items-center gap-3 rounded-[16px] border-2 border-dashed border-[#B9BEC6] bg-white px-3.5 text-[14px] font-semibold focus-within:outline focus-within:outline-[3px] focus-within:outline-violet"
+            className="flex min-h-16 cursor-pointer items-center gap-3 rounded-2xl border-2 border-dashed border-line bg-white px-4 text-sm font-semibold focus-within:outline focus-within:outline-2 focus-within:outline-brand"
           >
-            <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-lime text-ink">
-              <IconUpload size={20} />
+            <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-brand">
+              ↑
             </span>
             <span className="flex-1">{busy ? "Checking…" : "Drop a file or choose one"}</span>
-            <input id="file" type="file" className="sr-only" onChange={(e) => void onFile(e.target.files?.[0])} />
+            <input type="file" className="sr-only" onChange={(e) => void onFile(e.target.files?.[0])} />
           </label>
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              if (/^0x[0-9a-fA-F]{64}$/.test(hash.trim())) void byHash(hash);
+              void lookUp(query);
             }}
-            className="flex flex-wrap items-center gap-2 text-[14px]"
+            className="flex flex-col gap-2 text-sm"
           >
-            <label htmlFor="hash" className="text-grey">
-              or check a sha256
+            <label htmlFor="q" className="text-muted">
+              or a receipt id (rcp_…) or the file&apos;s sha256
             </label>
-            <input id="hash" className={`${inputClass} min-w-0 flex-[1_1_220px] font-mono text-[13px]`} placeholder="0x…" value={hash} onChange={(e) => setHash(e.target.value)} />
-            <button type="submit" disabled={busy || !/^0x[0-9a-fA-F]{64}$/.test(hash.trim())} className={btnClass("ink")}>
-              Look up
-            </button>
+            <div className="flex gap-2">
+              <input id="q" className={`${inputClass} font-mono text-xs`} placeholder="rcp_… or 64 hex characters" value={query} onChange={(e) => setQuery(e.target.value)} />
+              <button type="submit" disabled={busy || !query.trim()} className="rounded-xl bg-ink px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 cursor-pointer">
+                Look up
+              </button>
+            </div>
           </form>
-          <figure className="m-0 flex flex-col gap-2 rounded-[20px] bg-white p-3">
-            {file?.type.startsWith("video/") ? (
-              <video src={file.url} controls muted playsInline className="max-h-[560px] w-full rounded-[14px] bg-ink" />
-            ) : file ? (
+          <figure className="m-0 flex flex-col gap-2 rounded-2xl border border-line bg-white p-3">
+            {file ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={file.url} alt="The checked file" className="max-h-[560px] w-full rounded-[14px] bg-paper object-contain" />
+              <img src={file.url} alt="The checked file" className="max-h-[480px] w-full rounded-xl bg-paper object-contain" />
             ) : (
-              <div className={`flex items-center justify-center rounded-[14px] bg-paper p-4 text-center text-[14px] text-grey ${result ? "min-h-28" : "aspect-[4/5] max-h-[420px]"}`}>
-                {result ? "Checked by hash only, no file" : "The file you check appears here. It is hashed in your browser; nothing is uploaded."}
-              </div>
+              <div className="flex aspect-[4/3] items-center justify-center rounded-xl bg-paper p-4 text-center text-sm text-muted">The file you check appears here. It is hashed in your browser; nothing is uploaded.</div>
             )}
-            {checked && (
-              <figcaption className="tnum break-all font-mono text-[12px] text-grey">
-                sha256 {checked}
-                {file ? ` · ${Math.round(file.size / 102.4) / 10} KB` : ""}
-              </figcaption>
-            )}
+            {file && <figcaption className="break-all font-mono text-xs text-muted">sha256 {file.sha}</figcaption>}
           </figure>
         </div>
-
-        <div className="flex min-w-0 flex-col gap-[14px]">
-          <section id="out" aria-label="Result" aria-live="polite" className={`flex items-center gap-4 rounded-[20px] px-5 py-[18px] ${look?.bg ?? "bg-white"}`}>
-            <span aria-hidden="true" className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-full bg-ink">
-              <Icon size={24} stroke={look?.stroke ?? "#DCF37B"} />
-            </span>
-            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-              {result ? (
-                <>
-                  <span className="text-[26px] font-bold leading-tight">{look!.stamp}</span>
-                  <span className="text-[14px]">{subline(result)}</span>
-                </>
-              ) : (
-                <>
-                  <span className="text-[26px] font-bold leading-tight">{busy ? "Checking…" : "Ready when you are"}</span>
-                  <span className="text-[14px] text-grey">We hash the file and look up its receipt on {chain}. Nothing is stored.</span>
-                </>
-              )}
-            </div>
-            {known && <span className="hidden shrink-0 rounded-full bg-ink px-3 py-1 text-[12px] font-semibold text-white sm:inline">Licence #{result!.licenceId}</span>}
-          </section>
-
-          {error && <ErrorCard>{error}</ErrorCard>}
-
-          {!result && !error && (
-            <p className="m-0 text-[14px] text-grey">
-              Every render made through Likeness has a receipt on {chain} keyed by the file&apos;s sha256, anchored only after its HSP payment was recorded.
+        <div className="min-w-0">
+          {error && <p className="mb-3 rounded-xl bg-bad-soft px-4 py-3 text-sm text-bad">{error}</p>}
+          {result ? (
+            <Result result={result} />
+          ) : (
+            <p className="rounded-2xl border border-line bg-white p-4 text-sm text-muted">
+              Every ad made through Likeness has a receipt signed with Ed25519 that names its licence and the PayPal capture, payout or refund behind it.
               Edited or re-encoded copies come back Unknown.
             </p>
           )}
-
-          {known && (
-            <>
-              <div className="grid grid-cols-1 gap-[14px] sm:grid-cols-3">
-                <div className="flex min-w-0 flex-col gap-2 rounded-[18px] bg-white p-4">
-                  <span className="text-[13px] text-grey">Creator</span>
-                  <Link href={`/creators/${who?.slug ?? result!.creator!.toLowerCase()}`} className="flex min-w-0 items-center gap-2.5 font-semibold text-ink no-underline">
-                    <CreatorFace seed={result!.creator!} photo={who?.photo || null} size={36} />
-                    <span className="truncate">{who?.name ?? "Creator"}</span>
-                  </Link>
-                  <span className="text-[12px] text-grey">
-                    <Addr explorer={result!.explorer} a={result!.creator!} />
-                    {who ? ` · ${who.label.toLowerCase()}` : ""}
-                  </span>
-                </div>
-                <div className="flex min-w-0 flex-col gap-2 rounded-[18px] bg-white p-4">
-                  <span className="text-[13px] text-grey">Licensee</span>
-                  <span className="text-[14px] font-semibold">Brand agent</span>
-                  <span className="text-[12px] text-grey">
-                    <Addr explorer={result!.explorer} a={result!.licensee!} />
-                  </span>
-                </div>
-                <div className="flex min-w-0 flex-col gap-1.5 rounded-[18px] bg-white p-4">
-                  <span className="text-[13px] text-grey">Licence #{result!.licenceId} now</span>
-                  <span className="text-[20px] font-bold">{result!.licenceStatus === "Exhausted" ? "Used up" : result!.licenceStatus}</span>
-                  <span className="text-[12px] text-grey">{result!.licenceStatus === "Active" ? `Until ${fmtDay(result!.licenceEnd!)}` : `Licence period ${result!.licenceStatus === "Expired" ? "ended" : "ends"} ${fmtDay(result!.licenceEnd!)}`}</span>
-                </div>
-              </div>
-
-              {result!.render?.prompt && (
-                <section aria-label="What was generated" className="rounded-[18px] bg-white px-[18px] py-4 text-[14px]">
-                  <p className="m-0 font-semibold">
-                    What was generated: {result!.render.kind === "video" ? "a video ad" : "an image ad"}
-                    {result!.render.model ? `, ${result!.render.model} on Vertex AI` : ""}
-                  </p>
-                  <details className="mt-1">
-                    <summary className="cursor-pointer text-[13px] text-grey">The exact prompt</summary>
-                    <pre className="mt-1 max-h-60 overflow-auto whitespace-pre-wrap rounded-[10px] bg-paper p-2 font-sans text-[13px]">{result!.render.prompt}</pre>
-                  </details>
-                  <p className="m-0 mt-1 break-all font-mono text-[12px] text-grey">prompt sha256 {result!.render.promptSha256}</p>
-                </section>
-              )}
-
-              {result!.bundle && (
-                <section aria-label="Licence bundle" className="rounded-[18px] bg-white px-[18px] py-4 text-[14px]">
-                  <p className="m-0 font-semibold">
-                    Licence bundle{result!.bundle.brand ? ` taken by ${result!.bundle.brand}` : ""}
-                  </p>
-                  <p className="m-0 mt-1 text-grey">&ldquo;{result!.bundle.brief}&rdquo;</p>
-                  <p className="m-0 mt-1 text-[13px] text-grey">
-                    One licence per media type on {chain}:{" "}
-                    {[result!.bundle.imageLicence && `images #${result!.bundle.imageLicence}`, result!.bundle.videoLicence && `videos #${result!.bundle.videoLicence}`].filter(Boolean).join(", ")}
-                    . This file is {result!.bundle.kind === "video" ? "a video" : "an image"} under #{result!.licenceId}.
-                  </p>
-                </section>
-              )}
-
-              <section aria-label="Details" className="rounded-[18px] bg-white px-[18px] py-4">
-                <dl className="m-0 grid grid-cols-1 gap-x-[18px] gap-y-2.5 text-[13px] sm:grid-cols-3">
-                  <div>
-                    <dt className="text-grey">Render</dt>
-                    <dd className="m-0 mt-0.5 font-semibold">#{result!.renderIndex}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-grey">Paid</dt>
-                    <dd className="m-0 mt-0.5 font-semibold">{result!.paid} {result!.tokenSymbol ?? tokenOf(state)} through HSP</dd>
-                  </div>
-                  <div>
-                    <dt className="text-grey">Receipt anchored</dt>
-                    <dd className="m-0 mt-0.5 font-semibold">{fmtDate(result!.anchoredAt!)}</dd>
-                  </div>
-                </dl>
-              </section>
-
-              <ul className="on-dark m-0 grid list-none grid-cols-1 gap-x-5 gap-y-3 rounded-[18px] bg-ink p-[18px] text-[14px] text-white sm:grid-cols-2">
-                <Check ok>Receipt on {chain} {result!.anchorTx && <Tx explorer={result!.explorer} hash={result!.anchorTx} label="view tx" />}</Check>
-                <Check ok>HSP payment executed {result!.hspTxHash && <Tx explorer={result!.explorer} hash={result!.hspTxHash} label="view tx" />}</Check>
-                <Check ok={!!result!.recordTx}>Recorded by the creator&apos;s agent {result!.recordTx && <Tx explorer={result!.explorer} hash={result!.recordTx} label="view tx" />}</Check>
-                <Check ok={result!.licenceStatus === "Active"}>{result!.licenceStatus === "Active" ? "Licence still in force" : `Licence ${result!.licenceStatus?.toLowerCase()}`}</Check>
-              </ul>
-              <p className="m-0 text-[13px] text-grey">
-                {result!.nonceBound ? "The payment's authorization was bound to this render." : "HSP chose the authorization nonce; the creator's agent attested which render it paid for."}
-              </p>
-            </>
-          )}
-          {result?.verdict === "Unknown" && <p className="m-0 text-[13px] text-grey">{result.reason}</p>}
         </div>
       </div>
-    </AppPage>
-  );
-}
-
-function subline(v: Verdict): string {
-  switch (v.verdict) {
-    case "Licensed":
-      return "Made under a licence that is still in force: approved within the creator's terms, paid through HSP and recorded on chain.";
-    case "Revoked":
-      return "Licensed when it was made. The creator revoked the licence afterwards, so it should not be used in new placements.";
-    case "Expired":
-      return "Licensed when it was made. The licence period has ended.";
-    default:
-      return "No receipt for these exact bytes: edited, re-encoded, or never licensed.";
-  }
-}
-
-function Check({ ok, children }: { ok: boolean; children: React.ReactNode }) {
-  return (
-    <li className="flex items-center gap-2.5">
-      <span aria-hidden="true" className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${ok ? "bg-lime" : "bg-[#3A3D44]"}`}>
-        {ok ? <IconCheck size={14} stroke="#121316" /> : <IconCross size={12} stroke="#B9BCC4" />}
-      </span>
-      <span className="[&_a]:text-lime">
-        <span className="sr-only">{ok ? "Passed: " : "Not passed: "}</span>
-        {children}
-      </span>
-    </li>
+    </div>
   );
 }
