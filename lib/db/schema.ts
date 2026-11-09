@@ -1,13 +1,13 @@
 /** Database schema (Drizzle, Postgres on Neon). Money is stored in integer cents with a currency code. */
 import { sql } from "drizzle-orm";
-import { boolean, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { boolean, index, integer, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { BANNED_USES } from "../engine/policy";
+
+export { BANNED_USES };
 
 const ts = (name: string) => timestamp(name, { withTimezone: true });
 const createdAt = () => ts("created_at").notNull().defaultNow();
 
-import { BANNED_USES } from "../engine/policy";
-
-export { BANNED_USES };
 /** Uses a creator can offer. */
 export const USES = ["advertising", "social", "editorial", "internal"] as const;
 

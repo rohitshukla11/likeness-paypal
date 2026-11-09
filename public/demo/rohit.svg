@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 500" width="400" height="500" role="img" aria-label="Rohit, demo creator portrait (illustration)">
+<title>Rohit, demo creator portrait (illustration)</title>
+<defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#dbe7ff"/><stop offset="1" stop-color="#b9c8f0"/></linearGradient></defs>
+<rect width="400" height="500" fill="url(#bg)"/><g>
+  <ellipse cx="200" cy="470" rx="150" ry="110" fill="#2f4b8f"/>
+  <rect x="172" y="300" width="56" height="70" rx="20" fill="#c98d67"/>
+  <ellipse cx="200" cy="240" rx="88" ry="102" fill="#c98d67"/>
+  <path d="M112 236 C108 150 160 118 204 120 C256 122 296 156 288 236 C276 196 250 178 204 176 C160 176 126 196 112 236Z" fill="#1f1a17"/>
+  <ellipse cx="168" cy="246" rx="8" ry="9" fill="#2b2220"/><ellipse cx="232" cy="246" rx="8" ry="9" fill="#2b2220"/>
+  <path d="M150 222 q18 -10 36 0 M214 222 q18 -10 36 0" stroke="#1f1a17" stroke-width="6" fill="none" stroke-linecap="round"/>
+  <path d="M200 252 q-6 26 4 32" stroke="#b07a5b" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <path d="M172 302 q28 22 56 0" stroke="#8a3f35" stroke-width="6" fill="none" stroke-linecap="round"/>
+</g>
+</svg>
