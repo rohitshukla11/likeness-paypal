@@ -5,8 +5,9 @@ import { boolean, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex }
 const ts = (name: string) => timestamp(name, { withTimezone: true });
 const createdAt = () => ts("created_at").notNull().defaultNow();
 
-/** Uses no licence may ever allow, whatever the creator's terms say. */
-export const BANNED_USES = ["political", "adult", "minors", "impersonation", "deception"] as const;
+import { BANNED_USES } from "../engine/policy";
+
+export { BANNED_USES };
 /** Uses a creator can offer. */
 export const USES = ["advertising", "social", "editorial", "internal"] as const;
 
