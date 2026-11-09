@@ -82,3 +82,13 @@ export function getSetupToken(id: string, opts?: RequestOptions) {
 export function createPaymentToken(setupTokenId: string, opts?: RequestOptions) {
   return paypalRequest<PaymentToken>("POST", "/v3/vault/payment-tokens", { payment_source: { token: { id: setupTokenId, type: "SETUP_TOKEN" } } }, opts);
 }
+
+/** GET /v3/vault/payment-tokens/{id}: the saved wallet, if it still exists (404 once deleted). */
+export function getPaymentToken(id: string, opts?: RequestOptions) {
+  return paypalRequest<PaymentToken>("GET", `/v3/vault/payment-tokens/${encodeURIComponent(id)}`, undefined, opts);
+}
+
+/** GET /v3/vault/payment-tokens?customer_id=…: a PayPal customer's saved payment tokens. */
+export function listPaymentTokens(customerId: string, opts?: RequestOptions) {
+  return paypalRequest<{ customer?: { id: string }; payment_tokens?: PaymentToken[] }>("GET", `/v3/vault/payment-tokens?customer_id=${encodeURIComponent(customerId)}`, undefined, opts);
+}
