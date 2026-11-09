@@ -5,8 +5,17 @@
 Everything in this repository is new work unless it is listed under "Reused code" below.
 
 - Next.js app scaffold (App Router, TypeScript), Drizzle schema for PayPal records.
-- `lib/paypal/`: the PayPal REST client (Vault v3, Orders v2, Payments v2, Payouts v1).
-- `scripts/paypal-smoke.ts`: the sandbox end-to-end run.
+- `lib/paypal/`: the PayPal REST client (Vault v3, Orders v2, Payments v2, Payouts v1, the JS SDK v6 client token).
+- `scripts/paypal-smoke.ts`: the sandbox end-to-end run. `scripts/paypal-fresh-token.ts`: the token and scope check.
+- The schema for creators, brands, licences, mandates, renders, receipts, refusals and demo workspaces (migration 0001).
+- `lib/engine/`: the render-and-pay engine. It covers the policy transaction, authorize on the vault_id, render,
+  compliance, capture or void, the review window, payout or refund, and the signed receipt. It also has its ports, the
+  Postgres store, and the StubProvider with a Gemini skeleton. The mandate checker in `policy.ts` is adapted from
+  reused code (below).
+- The UI: the landing page, the Brand page (mandate, licence request, Save PayPal wallet with JS SDK v6), the Studio,
+  the Creator page and Verify. The demo images in `public/demo/` were drawn for this project as SVG.
+- `tests/` (unit tests) and `scripts/engine-e2e.ts` (the engine against the PayPal sandbox).
+- `docs/DEPLOY.md`: research on Render Workflows.
 
 ## Reused code
 
