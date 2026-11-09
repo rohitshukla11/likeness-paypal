@@ -68,7 +68,16 @@ async function main() {
 
   await step("1 OAuth token", () => accessToken(config), () => "ok");
 
-  const setup = await step("2 setup token", () => createSetupToken({ returnUrl: `${appUrl}/paypal/vault/return`, cancelUrl: `${appUrl}/paypal/vault/cancel` }, { requestId: `${run}-setup` }), (t) => `${short(t.id)} ${t.status}`);
+  // UNSCHEDULED_POSTPAID first; if the sandbox refuses it, IMMEDIATE (and say so).
+  const urls = { returnUrl: `${appUrl}/paypal/vault/return`, cancelUrl: `${appUrl}/paypal/vault/cancel` };
+  let setup;
+  try {
+    setup = await step("2 setup token", () => createSetupToken({ ...urls, usagePattern: "UNSCHEDULED_POSTPAID" }, { requestId: `${run}-setup` }), (t) => `${short(t.id)} ${t.status} (usage_pattern UNSCHEDULED_POSTPAID)`);
+  } catch (e) {
+    if (!(e instanceof PayPalError) || ![400, 422].includes(e.status)) throw e;
+    line("  retry", "UNSCHEDULED_POSTPAID was refused (above); retrying with IMMEDIATE");
+    setup = await step("2 setup token", () => createSetupToken({ ...urls, usagePattern: "IMMEDIATE" }, { requestId: `${run}-setup-immediate` }), (t) => `${short(t.id)} ${t.status} (usage_pattern IMMEDIATE)`);
+  }
   if (!setup.approveUrl) throw new Error("no approve link on the setup token");
   console.log(`\n  Approve link (sandbox buyer): ${setup.approveUrl}\n`);
   const approval = await waitForApproval(setup.id);

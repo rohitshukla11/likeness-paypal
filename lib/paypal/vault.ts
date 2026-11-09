@@ -27,8 +27,11 @@ export interface SetupTokenInput {
   cancelUrl: string;
   description?: string;
   brandName?: string;
-  /** How the saved wallet will be charged. Default IMMEDIATE (PayPal's documented example). */
-  usagePattern?: "IMMEDIATE" | "DEFERRED" | "UNSCHEDULED_POSTPAID" | "UNSCHEDULED_PREPAID";
+  /**
+   * How the saved wallet will be charged. Default UNSCHEDULED_POSTPAID: the brand is charged per render, at
+   * unscheduled times, after the fact (Vault v3 `payment_source.paypal.usage_pattern`).
+   */
+  usagePattern?: "UNSCHEDULED_POSTPAID" | "IMMEDIATE" | "DEFERRED" | "UNSCHEDULED_PREPAID";
   /** An existing PayPal customer id, to add the wallet to that customer. */
   customerId?: string;
 }
@@ -44,7 +47,7 @@ export async function createSetupToken(input: SetupTokenInput, opts?: RequestOpt
         paypal: {
           description: input.description ?? "Pay for licensed ads",
           permit_multiple_payment_tokens: false,
-          usage_pattern: input.usagePattern ?? "IMMEDIATE",
+          usage_pattern: input.usagePattern ?? "UNSCHEDULED_POSTPAID",
           usage_type: "MERCHANT",
           customer_type: "CONSUMER",
           experience_context: {
