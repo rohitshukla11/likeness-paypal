@@ -1,0 +1,16 @@
+#!/bin/sh
+# Blocks env files, key files and obvious secrets from being committed.
+fail=0
+for f in $(git diff --cached --name-only --diff-filter=ACMR); do
+  case "$f" in
+    .env.example) ;;
+    .env*|*/.env*|*.pem|*.key|*.p12) echo "pre-commit: refusing to commit $f" >&2; fail=1 ;;
+  esac
+done
+# Added lines only. Patterns: PayPal tokens, live/sandbox secrets assigned in code, Postgres URLs with a password,
+# Google API keys, private keys.
+if git diff --cached -U0 --diff-filter=ACMR -- . ':(exclude).githooks/pre-commit' | grep -E '^\+' | grep -qE \
+  'A21AA[A-Za-z0-9_-]{20,}|(CLIENT_SECRET|ACCESS_TOKEN|API_KEY|DATABASE_URL)[A-Z_]*[[:space:]]*[:=][[:space:]]*["'"'"']?[A-Za-z0-9_./+:@-]{16,}|postgres(ql)?://[^:/[:space:]]+:[^@[:space:]]+@|AIza[0-9A-Za-z_-]{35}|-----BEGIN [A-Z ]*PRIVATE KEY-----'; then
+  echo "pre-commit: a staged change looks like a secret; commit refused" >&2; fail=1
+fi
+exit $fail

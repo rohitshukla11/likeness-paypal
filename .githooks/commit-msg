@@ -1,0 +1,6 @@
+#!/bin/sh
+# Rejects commit messages with a co-author trailer or a coding-tool attribution.
+if grep -qiE 'co-authored-by|cl[a]ude' "$1"; then
+  echo "commit-msg: the message contains a co-author trailer or a tool attribution; rejected." >&2
+  exit 1
+fi
