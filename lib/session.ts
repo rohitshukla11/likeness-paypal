@@ -4,6 +4,7 @@ import "server-only";
  * playing (brand or creator). No accounts: a workspace is the visitor's private sandbox of rows.
  */
 import { cookies } from "next/headers";
+import { connection } from "next/server";
 import { getWorkspace, type Workspace } from "./demo";
 
 export type Role = "brand" | "creator";
@@ -12,6 +13,8 @@ const ROLE = "lk_role";
 const MAX_AGE = 30 * 86_400;
 
 export async function getSession(): Promise<(Workspace & { role: Role }) | null> {
+  // Request time from here on: the database driver uses randomness when it connects, which Next.js won't prerender.
+  await connection();
   const jar = await cookies();
   const id = jar.get(WS)?.value;
   if (!id || !/^ws_[A-Za-z0-9_-]{22}$/.test(id)) return null;

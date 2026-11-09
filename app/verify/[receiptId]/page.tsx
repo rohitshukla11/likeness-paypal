@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { connection } from "next/server";
 import { Suspense } from "react";
 import { verifyReceipt } from "@/lib/verify";
 import { Result } from "../result";
@@ -22,5 +23,6 @@ export default function ReceiptPage(props: PageProps<"/verify/[receiptId]">) {
 
 async function Receipt({ params }: PageProps<"/verify/[receiptId]">) {
   const { receiptId } = await params;
+  await connection(); // request time: the receipt is read from the database
   return <Result result={await verifyReceipt(decodeURIComponent(receiptId))} />;
 }
