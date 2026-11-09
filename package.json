@@ -12,7 +12,8 @@
     "paypal:fresh-token": "tsx --env-file-if-exists=.env.local scripts/paypal-fresh-token.ts",
     "check:agent-toolkit": "tsx --env-file-if-exists=.env.local scripts/agent-toolkit-check.ts",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate"
+    "db:migrate": "drizzle-kit migrate",
+    "test": "tsx --test --test-reporter=spec tests/*.test.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "1.2.0",
