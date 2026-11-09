@@ -9,6 +9,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "smoke:paypal": "tsx --env-file-if-exists=.env.local scripts/paypal-smoke.ts",
+    "paypal:fresh-token": "tsx --env-file-if-exists=.env.local scripts/paypal-fresh-token.ts",
     "check:agent-toolkit": "tsx --env-file-if-exists=.env.local scripts/agent-toolkit-check.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate"
