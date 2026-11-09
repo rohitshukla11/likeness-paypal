@@ -1,6 +1,13 @@
 /**
- * Saving a buyer's PayPal wallet without a purchase (Vault v3): a setup token the buyer approves, then a
- * payment token whose id is the vault_id for later merchant-initiated orders.
+ * The brand's MANDATE saves its PayPal wallet once, without a purchase (Vault v3): a setup token the brand approves,
+ * then a payment token whose id is the vault_id that every render's authorization is charged to.
+ *
+ * The payment model: the creator approves a LICENCE once; the brand approves a MANDATE once (its limits, and saving
+ * its PayPal wallet). Per render: policy check -> authorize on the vault_id -> render -> compliance check -> capture
+ * -> payout to the creator (90%). The authorization is voided if the render or the compliance check fails; the
+ * capture is refunded if the brand rejects the ad. A revoked or expired licence, or an exceeded mandate, is refused
+ * before any PayPal call.
+ *
  * https://developer.paypal.com/docs/checkout/save-payment-methods/purchase-later/payment-tokens-api/paypal/
  */
 import { linkOf, paypalRequest, type RequestOptions } from "./http";

@@ -1,9 +1,9 @@
 /**
- * PayPal sandbox smoke test, end to end:
- *   OAuth token → setup token (the sandbox buyer approves in a browser) → payment token (vault_id)
- *   → order 1: authorize $2.00 → capture → payout $1.80 to PAYPAL_SANDBOX_CREATOR_EMAIL
- *   → order 2: authorize → void
- *   → order 3: authorize → capture → refund
+ * PayPal sandbox smoke test of the payment model, end to end (no render or policy code yet: PayPal calls only):
+ *   the brand's mandate: OAuth token → setup token (the sandbox buyer approves in a browser) → payment token (vault_id)
+ *   → render accepted: authorize $2.00 → capture → payout $1.80 (the creator's 90%) to PAYPAL_SANDBOX_CREATOR_EMAIL
+ *   → render failed (render or compliance check): authorize → void
+ *   → brand rejected the delivered ad: authorize → capture → refund
  * Prints only truncated IDs and statuses; never a token or a secret. Sandbox only.
  *
  *   pnpm smoke:paypal

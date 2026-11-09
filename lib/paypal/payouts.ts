@@ -1,6 +1,7 @@
 /**
- * Payouts v1: one payment to one recipient by email. sender_batch_id is the idempotency key: PayPal refuses a
- * second batch with the same id (and PayPal-Request-Id is set from it too).
+ * Payouts v1: the creator's share (90% of a captured render) to the creator's PayPal email, one payout per capture.
+ * sender_batch_id is the idempotency key: PayPal refuses a second batch with the same id (and PayPal-Request-Id is set
+ * from it too).
  * https://developer.paypal.com/docs/api/payments.payouts-batch/v1/
  */
 import { paypalRequest, type RequestOptions } from "./http";

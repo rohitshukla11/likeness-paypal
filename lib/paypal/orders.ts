@@ -1,6 +1,13 @@
 /**
- * Orders v2 and Payments v2: an order charged to a saved PayPal wallet (vault_id) with intent AUTHORIZE, then
- * capture, void or refund. https://developer.paypal.com/docs/api/orders/v2/ and /docs/api/payments/v2/
+ * Orders v2 and Payments v2: one order per render, charged to the brand's saved wallet (vault_id) with intent
+ * AUTHORIZE; then capture (render delivered and compliant), void (render or compliance failed) or refund (the brand
+ * rejected the ad). https://developer.paypal.com/docs/api/orders/v2/ and /docs/api/payments/v2/
+ *
+ * The payment model: the creator approves a LICENCE once; the brand approves a MANDATE once (its limits, and saving
+ * its PayPal wallet). Per render: policy check -> authorize on the vault_id -> render -> compliance check -> capture
+ * -> payout to the creator (90%). The authorization is voided if the render or the compliance check fails; the
+ * capture is refunded if the brand rejects the ad. A revoked or expired licence, or an exceeded mandate, is refused
+ * before any PayPal call.
  */
 import { money, paypalRequest, type RequestOptions } from "./http";
 

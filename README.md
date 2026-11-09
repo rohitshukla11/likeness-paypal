@@ -5,6 +5,16 @@ is authorized and captured, and the creator is paid out. Built for the PayPal AI
 
 **Status:** scaffold and PayPal sandbox spike. No UI and no AI calls yet.
 
+## How payments work
+
+- **The creator approves a licence once:** who may use their face, for what, until when, at what price.
+- **The brand approves a mandate once:** its spending limits, and saving its PayPal wallet (a Vault payment token).
+- **Per render:** policy check → authorize on the saved wallet → render → compliance check → capture → payout to the
+  creator (90%).
+  - The authorization is **voided** if the render or the compliance check fails.
+  - The capture is **refunded** if the brand rejects the ad.
+  - A revoked or expired licence, or an exceeded mandate, is **refused before any PayPal call**.
+
 ## Setup
 
 ```sh
