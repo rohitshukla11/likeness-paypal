@@ -1,73 +1,38 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import Link from "next/link";
-import { Suspense } from "react";
-import { continueAs, resetDemo } from "./actions";
+import { Poppins, Unbounded } from "next/font/google";
+import { SiteFooter } from "@/components/site/SiteFooter";
 import "./globals.css";
-import { getSession } from "@/lib/session";
+import { Providers } from "./providers";
 
-const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
-const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
+const display = Unbounded({ subsets: ["latin"], weight: ["700", "800", "900"], variable: "--font-display-face", display: "swap" });
+const body = Poppins({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--font-body-face", display: "swap" });
+
+const TAGLINE = "Your face. Your terms. Get paid per ad.";
+const DESCRIPTION = `${TAGLINE} Creators license their likeness for AI image and video ads, priced by their audience; brands generate consented ads in minutes and pay per render; anyone can verify a file.`;
 
 export const metadata: Metadata = {
-  title: "Likeness × PayPal",
-  description: "License your face to AI ads, paid with PayPal: approved once, charged per render, paid out per accepted ad.",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"),
+  title: { default: `Likeness AI: ${TAGLINE}`, template: "%s · Likeness AI" },
+  description: DESCRIPTION,
+  openGraph: { type: "website", siteName: "Likeness AI", title: `Likeness AI: ${TAGLINE}`, description: DESCRIPTION },
+  twitter: { card: "summary", title: `Likeness AI: ${TAGLINE}`, description: DESCRIPTION },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
-      <body className="min-h-dvh font-sans">
-        <header className="sticky top-0 z-10 border-b border-line bg-white/90 backdrop-blur">
-          <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-3">
-            <Link href="/" className="flex items-center gap-2 font-bold tracking-tight text-ink no-underline">
-              <span aria-hidden="true" className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-brand text-sm text-white">
-                L
-              </span>
-              Likeness <span className="font-medium text-muted">× PayPal</span>
-            </Link>
-            <nav className="flex flex-wrap items-center gap-1.5 text-sm">
-              <Suspense fallback={null}>
-                <Personas />
-              </Suspense>
-              <Link href="/verify" className="rounded-lg px-2.5 py-1.5 font-medium text-muted hover:bg-paper hover:text-ink">
-                Verify
-              </Link>
-            </nav>
-          </div>
-        </header>
-        <main className="mx-auto max-w-6xl px-4 py-6 sm:py-8">{children}</main>
-        <footer className="mx-auto max-w-6xl px-4 pb-10 text-xs text-muted">
-          PayPal sandbox only. Demo renders are pre-generated images (no AI calls). Built for the PayPal AI Hackathon.
-        </footer>
+    <html lang="en" className={`${display.variable} ${body.variable}`}>
+      <body className="min-h-screen bg-ink font-sans text-ink">
+        {/* For screen recordings on localhost: NEXT_PUBLIC_HIDE_DEV_OVERLAY=1 hides Next's dev overlay
+            (its badge and issue toasts, including errors thrown by browser extensions). Dev only. */}
+        {process.env.NODE_ENV === "development" && process.env.NEXT_PUBLIC_HIDE_DEV_OVERLAY === "1" && <style>{"nextjs-portal{display:none!important}"}</style>}
+        <a href="#main" className="sr-only z-50 rounded-full bg-lime px-5 py-3 font-semibold text-ink focus:not-sr-only focus:fixed focus:left-4 focus:top-4">
+          Skip to content
+        </a>
+        <Providers>
+          {children}
+          <SiteFooter />
+        </Providers>
       </body>
     </html>
-  );
-}
-
-/** Persona switcher and Reset (reads the session cookie, so it streams in behind Suspense). */
-async function Personas() {
-  const s = await getSession();
-  if (!s) return null;
-  const tab = (role: "brand" | "creator", label: string) => (
-    <form action={continueAs.bind(null, role)}>
-      <button className={`rounded-lg px-2.5 py-1.5 font-medium ${s.role === role ? "bg-brand-soft text-brand" : "text-muted hover:bg-paper hover:text-ink"} cursor-pointer`}>{label}</button>
-    </form>
-  );
-  return (
-    <>
-      {tab("brand", "Brand")}
-      {s.role === "brand" && (
-        <Link href="/brand/studio" className="rounded-lg px-2.5 py-1.5 font-medium text-muted hover:bg-paper hover:text-ink">
-          Studio
-        </Link>
-      )}
-      {tab("creator", "Creator")}
-      <form action={resetDemo}>
-        <button className="rounded-lg px-2.5 py-1.5 font-medium text-muted hover:bg-paper hover:text-bad cursor-pointer" title="Start a fresh demo workspace">
-          Reset demo
-        </button>
-      </form>
-    </>
   );
 }
