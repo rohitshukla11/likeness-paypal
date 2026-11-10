@@ -5,10 +5,12 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { canonicalJson, sha256Hex } from "@/lib/canonical";
 import { db } from "@/lib/db";
-import { mandates, paypalVaultTokens } from "@/lib/db/schema";
+import { brands, mandates } from "@/lib/db/schema";
 import { HttpError, newId } from "@/lib/errors";
 import { fileRequest } from "@/lib/licences";
+import { PayPalError } from "@/lib/paypal/http";
 import { getSession } from "@/lib/session";
+import { attachSharedDemoWallet } from "@/lib/wallet";
 
 async function me() {
   const s = await getSession();
@@ -33,7 +35,8 @@ export async function saveMandate(form: FormData) {
   const expiresAt = new Date(Date.now() + days * 86_400_000);
   const terms = { brandId: s.brandId, maxPerRenderCents: perRender, dailyCapCents: daily, totalBudgetCents: budget, stepUpThresholdCents: stepUp, expiresAt: expiresAt.toISOString() };
   const termsSha256 = sha256Hex(canonicalJson(terms));
-  const [wallet] = await db().select().from(paypalVaultTokens).where(eq(paypalVaultTokens.brandId, s.brandId)).orderBy(desc(paypalVaultTokens.createdAt)).limit(1);
+  const [brand] = await db().select().from(brands).where(eq(brands.id, s.brandId));
+  const wallet = brand?.paymentTokenId ? { paymentTokenId: brand.paymentTokenId } : null;
   const [current] = await db().select().from(mandates).where(and(eq(mandates.brandId, s.brandId), ne(mandates.status, "revoked"))).orderBy(desc(mandates.createdAt)).limit(1);
   const limits = { maxPerRenderCents: perRender, dailyCapCents: daily, totalBudgetCents: budget, stepUpThresholdCents: stepUp, expiresAt, termsSha256 };
   if (current) {
@@ -62,4 +65,16 @@ export async function requestLicence(form: FormData) {
     back({ error: e instanceof HttpError ? e.message : "Could not send the request" });
   }
   back({ ok: "Request sent. Switch to the Creator persona to approve it." });
+}
+
+/** Attach the shared sandbox demo wallet instead of saving one at PayPal. */
+export async function attachDemoWallet() {
+  const s = await me();
+  try {
+    await attachSharedDemoWallet(s.brandId);
+  } catch (e) {
+    back({ error: e instanceof HttpError ? e.message : e instanceof PayPalError ? e.toString() : "Could not attach the demo wallet" });
+  }
+  revalidatePath("/brand");
+  back({ ok: "Demo wallet attached (a shared sandbox buyer). Your mandate charges it from now on." });
 }

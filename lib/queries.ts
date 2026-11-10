@@ -36,7 +36,7 @@ export async function creatorView(creatorId: string) {
 export async function brandView(brandId: string) {
   const [brand] = await db().select().from(brands).where(eq(brands.id, brandId));
   const [mandate] = await db().select().from(mandates).where(eq(mandates.brandId, brandId)).orderBy(desc(mandates.createdAt)).limit(1);
-  const [wallet] = await db().select().from(paypalVaultTokens).where(eq(paypalVaultTokens.brandId, brandId)).orderBy(desc(paypalVaultTokens.createdAt)).limit(1);
+  const [wallet] = brand?.paymentTokenId ? await db().select().from(paypalVaultTokens).where(eq(paypalVaultTokens.paymentTokenId, brand.paymentTokenId)) : [];
   const ws = brand?.workspaceId;
   const workspaceCreators = ws ? await db().select().from(creators).where(eq(creators.workspaceId, ws)) : [];
   const brandLicences = await listFor("brandId", brandId);
@@ -49,7 +49,7 @@ export async function brandView(brandId: string) {
     const start = utcDayStart(new Date());
     spentToday = today.filter((r) => r.createdAt >= start).reduce((s, r) => s + r.amount, 0);
   }
-  return { brand, mandate: mandate ?? null, wallet: wallet ?? null, creators: workspaceCreators, licences: brandLicences, spentToday };
+  return { brand, mandate: mandate ?? null, wallet: wallet ? { ...wallet, kind: (brand.walletKind ?? "own") as "own" | "demo" } : null, creators: workspaceCreators, licences: brandLicences, spentToday };
 }
 
 /** The brand's renders, newest first, with the latest refusal reason and the receipt id. */

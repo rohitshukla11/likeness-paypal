@@ -6,7 +6,8 @@ import { brandView } from "@/lib/queries";
 import { getSession } from "@/lib/session";
 import { Notice } from "../notice";
 import { Badge, btn, Card, day, Empty, Field, input, Mono, PageTitle, short, Stat, toneOf, usd } from "../ui";
-import { requestLicence, saveMandate } from "./actions";
+import { demoWalletAvailable } from "@/lib/wallet";
+import { attachDemoWallet, requestLicence, saveMandate } from "./actions";
 import { WalletButton } from "./wallet-button";
 
 export default function BrandPage(props: PageProps<"/brand">) {
@@ -38,14 +39,22 @@ async function Brand({ searchParams }: PageProps<"/brand">) {
           {wallet ? (
             <div className="text-sm">
               <p>
-                <span className="font-semibold">{wallet.payerEmail ?? "PayPal account"}</span> is saved for pay-per-render.
+                <span className="font-semibold">{wallet.kind === "demo" ? "Demo wallet (shared sandbox buyer)" : (wallet.payerEmail ?? "PayPal account")}</span> is saved for pay-per-render.
               </p>
               <p className="mt-1 text-muted">
                 Vault id <Mono>{short(wallet.paymentTokenId)}</Mono> · usage UNSCHEDULED_POSTPAID · saved {day(wallet.createdAt)}
               </p>
             </div>
           ) : (
-            <WalletButton />
+            <div className="flex flex-col gap-3">
+              <WalletButton />
+              {demoWalletAvailable() && (
+                <form action={attachDemoWallet} className="flex flex-wrap items-center gap-2 border-t border-line pt-3">
+                  <button className={btn.ghost}>Use demo wallet</button>
+                  <span className="text-xs text-muted">No sandbox login? Use a shared sandbox buyer wallet instead.</span>
+                </form>
+              )}
+            </div>
           )}
         </Card>
 

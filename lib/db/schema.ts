@@ -1,6 +1,6 @@
 /** Database schema (Drizzle, Postgres on Neon). Money is stored in integer cents with a currency code. */
 import { sql } from "drizzle-orm";
-import { boolean, index, integer, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { boolean, index, integer, pgTable, text, timestamp, uniqueIndex, type AnyPgColumn } from "drizzle-orm/pg-core";
 import { BANNED_USES } from "../engine/policy";
 
 export { BANNED_USES };
@@ -20,7 +20,7 @@ export const paypalVaultTokens = pgTable("paypal_vault_tokens", {
   customerId: text("customer_id"),
   payerEmail: text("payer_email"),
   /** The brand that saved it (null for wallets saved by scripts). */
-  brandId: text("brand_id").references(() => brands.id),
+  brandId: text("brand_id").references((): AnyPgColumn => brands.id),
   createdAt: createdAt(),
 });
 
@@ -88,6 +88,10 @@ export const brands = pgTable(
     workspaceId: text("workspace_id").references(() => workspaces.id),
     name: text("name").notNull(),
     pendingSetupTokenId: text("pending_setup_token_id"),
+    /** The wallet this brand's mandate charges: its own saved wallet, or the shared sandbox demo wallet. */
+    paymentTokenId: text("payment_token_id").references((): AnyPgColumn => paypalVaultTokens.paymentTokenId),
+    /** own | demo */
+    walletKind: text("wallet_kind"),
     createdAt: createdAt(),
   },
   (t) => [index("brands_workspace_idx").on(t.workspaceId)],

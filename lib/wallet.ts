@@ -10,7 +10,7 @@ import { and, eq, ne } from "drizzle-orm";
 import { db } from "./db";
 import { brands, mandates, paypalVaultTokens } from "./db/schema";
 import { HttpError } from "./errors";
-import { createPaymentToken, createSetupToken, getSetupToken } from "./paypal/vault";
+import { createPaymentToken, createSetupToken, getPaymentToken, getSetupToken } from "./paypal/vault";
 
 export async function startWalletSetup(brandId: string, appUrl: string) {
   const [b] = await db().select().from(brands).where(eq(brands.id, brandId));
@@ -30,7 +30,7 @@ export async function startWalletSetup(brandId: string, appUrl: string) {
 export async function completeWalletSetup(brandId: string, setupTokenId?: string | null) {
   const [b] = await db().select().from(brands).where(eq(brands.id, brandId));
   if (!b?.pendingSetupTokenId) {
-    const [w] = await db().select().from(paypalVaultTokens).where(eq(paypalVaultTokens.brandId, brandId));
+    const [w] = b?.paymentTokenId ? await db().select().from(paypalVaultTokens).where(eq(paypalVaultTokens.paymentTokenId, b.paymentTokenId)) : [];
     if (w) return w; // already saved (a reload of the return page)
     throw new HttpError(409, "no wallet setup in progress");
   }
@@ -48,7 +48,7 @@ export async function completeWalletSetup(brandId: string, setupTokenId?: string
   await db().transaction(async (tx) => {
     await tx.insert(paypalVaultTokens).values(row).onConflictDoUpdate({ target: paypalVaultTokens.paymentTokenId, set: { brandId } });
     await tx.update(mandates).set({ paymentTokenId: pt.id, status: "active" }).where(and(eq(mandates.brandId, brandId), ne(mandates.status, "revoked")));
-    await tx.update(brands).set({ pendingSetupTokenId: null }).where(eq(brands.id, brandId));
+    await tx.update(brands).set({ pendingSetupTokenId: null, paymentTokenId: pt.id, walletKind: "own" }).where(eq(brands.id, brandId));
   });
   return row;
 }
@@ -59,4 +59,27 @@ export function appOrigin(h: Headers): string {
   const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
   const proto = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") || host.startsWith("127.") ? "http" : "https");
   return `${proto}://${host}`;
+}
+
+/** Whether the shared sandbox demo wallet is configured (DEMO_VAULT_ID). */
+export const demoWalletAvailable = () => !!process.env.DEMO_VAULT_ID;
+
+/**
+ * "Use demo wallet": attaches the shared sandbox wallet (DEMO_VAULT_ID, a payment token saved once by a sandbox
+ * buyer) to this brand, so a visitor can render without a sandbox PayPal login. Sandbox only; checked with PayPal.
+ */
+export async function attachSharedDemoWallet(brandId: string) {
+  const id = process.env.DEMO_VAULT_ID;
+  if (!id) throw new HttpError(404, "no demo wallet is configured");
+  if ((process.env.PAYPAL_ENV ?? "sandbox") !== "sandbox") throw new HttpError(403, "the demo wallet is sandbox only");
+  const pt = await getPaymentToken(id);
+  await db().transaction(async (tx) => {
+    await tx
+      .insert(paypalVaultTokens)
+      .values({ paymentTokenId: pt.id, setupTokenId: "demo-wallet", customerId: pt.customer?.id ?? null, payerEmail: pt.payment_source?.paypal?.email_address ?? null })
+      .onConflictDoNothing();
+    await tx.update(brands).set({ paymentTokenId: pt.id, walletKind: "demo", pendingSetupTokenId: null }).where(eq(brands.id, brandId));
+    await tx.update(mandates).set({ paymentTokenId: pt.id, status: "active" }).where(and(eq(mandates.brandId, brandId), ne(mandates.status, "revoked")));
+  });
+  return pt.id;
 }
