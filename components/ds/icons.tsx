@@ -10,13 +10,6 @@ export const IconPerson = ({ size, className, stroke = "currentColor" }: P) => (
   </svg>
 );
 
-export const IconSearch = ({ size, className, stroke = "currentColor" }: P) => (
-  <svg {...base(size)} className={className} stroke={stroke} strokeWidth="2.4" strokeLinecap="round">
-    <circle cx="11" cy="11" r="7" />
-    <path d="M20 20l-4-4" />
-  </svg>
-);
-
 export const IconCheck = ({ size, className, stroke = "currentColor" }: P) => (
   <svg {...base(size)} className={className} stroke={stroke} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
     <path d="M5 12l5 5L20 7" />
@@ -66,30 +59,10 @@ export const IconUpload = ({ size, className, stroke = "currentColor" }: P) => (
   </svg>
 );
 
-export const IconBookmark = ({ size, className, stroke = "currentColor", filled }: P & { filled?: boolean }) => (
-  <svg {...base(size)} className={className} stroke={stroke} strokeWidth="2" strokeLinejoin="round" fill={filled ? stroke : "none"}>
-    <path d="M6 4h12v16l-6-4-6 4z" />
-  </svg>
-);
-
 export const IconShield = ({ size, className, stroke = "currentColor" }: P) => (
   <svg {...base(size)} className={className} stroke={stroke} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6z" />
     <path d="M9 12l2 2 4-4" />
-  </svg>
-);
-
-export const IconCamera = ({ size, className }: P) => (
-  <svg {...base(size)} className={className} fill="currentColor">
-    <path d="M4 7h11a2 2 0 0 1 2 2v1.5l4-2.5v8l-4-2.5V15a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2z" />
-  </svg>
-);
-
-/** The verified rosette from the marketplace mockup; carries its own accessible name. */
-export const VerifiedMark = ({ size = 20, label = "Verified creator" }: { size?: number; label?: string }) => (
-  <svg role="img" aria-label={label} viewBox="0 0 24 24" width={size} height={size} className="shrink-0">
-    <path d="M12 2l2.6 2.2 3.4-.4.8 3.3 3 1.6-1.3 3.2 1.3 3.2-3 1.6-.8 3.3-3.4-.4L12 22l-2.6-2.2-3.4.4-.8-3.3-3-1.6 1.3-3.2-1.3-3.2 3-1.6.8-3.3 3.4.4z" fill="#121316" />
-    <path d="M8 12l3 3 5-6" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 );
 

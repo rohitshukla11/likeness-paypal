@@ -1,18 +1,10 @@
 /**
- * Small app primitives, in the Likeness design system (app/globals.css, components/ds). Older pages
- * and panels use these; they render as white cards and pills on the off-white panel.
+ * Small app primitives, in the Likeness design system (app/globals.css, components/ds): labelled fields, inputs,
+ * status pills for licence states, notes and dates. Server-safe (no hooks), so the server pages and forms use them.
  */
 import type { ReactNode } from "react";
-import type { LicenceStatus } from "@/lib/model";
-import { btnClass, StatusPill, type PillKind } from "./ds";
-
-export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <section className={`rounded-[20px] bg-white p-[18px] text-[14px] text-ink sm:px-5 ${className}`}>{children}</section>;
-}
-
-export function H2({ children }: { children: ReactNode }) {
-  return <h2 className="m-0 text-[18px] font-bold leading-tight">{children}</h2>;
-}
+import type { LicenceState } from "@/lib/licences";
+import { StatusPill, type PillKind } from "./ds";
 
 type Tone = "up" | "down" | "warn" | "blue" | "dim";
 const pillOf: Record<Tone, PillKind> = { up: "licensed", down: "revoked", warn: "waiting", blue: "waiting", dim: "neutral" };
@@ -25,34 +17,19 @@ export function Badge({ tone, children, title }: { tone: Tone; children: ReactNo
   );
 }
 
-export const STATUS_LABEL: Record<LicenceStatus, string> = { Active: "Licensed", Revoked: "Revoked", Expired: "Expired", Exhausted: "Used up" };
+export const STATUS_LABEL: Record<LicenceState, string> = {
+  active: "Licensed",
+  pending: "Waiting for the creator",
+  declined: "Declined",
+  revoked: "Revoked",
+  expired: "Expired",
+  exhausted: "Used up",
+};
 
-export function StatusBadge({ status }: { status: LicenceStatus }) {
-  const kind: PillKind = status === "Active" ? "licensed" : status === "Revoked" ? "revoked" : "expired";
-  return <StatusPill kind={kind}>{STATUS_LABEL[status]}</StatusPill>;
-}
+const STATUS_KIND: Record<LicenceState, PillKind> = { active: "licensed", pending: "waiting", declined: "revoked", revoked: "revoked", expired: "expired", exhausted: "expired" };
 
-export function Button({
-  children,
-  onClick,
-  disabled,
-  kind = "primary",
-  type = "button",
-  label,
-}: {
-  children: ReactNode;
-  onClick?: () => void;
-  disabled?: boolean;
-  kind?: "primary" | "secondary" | "danger" | "ghost" | "ink";
-  type?: "button" | "submit";
-  label?: string;
-}) {
-  const k = ({ primary: "lime", secondary: "outline", danger: "danger", ghost: "ghost", ink: "ink" } as const)[kind];
-  return (
-    <button type={type} onClick={onClick} disabled={disabled} aria-label={label} className={btnClass(k)}>
-      {children}
-    </button>
-  );
+export function StatusBadge({ status }: { status: LicenceState }) {
+  return <StatusPill kind={STATUS_KIND[status]}>{STATUS_LABEL[status]}</StatusPill>;
 }
 
 export function Note({ tone = "warn", children }: { tone?: Tone; children: ReactNode }) {
@@ -71,7 +48,7 @@ export function Field({ label, children, hint, group }: { label: string; childre
       </fieldset>
     );
   return (
-    <label className="block space-y-1.5">
+    <label className="block min-w-0 space-y-1.5">
       <span className="text-[14px] font-medium text-grey">{label}</span>
       {children}
       {hint && <span className="block text-[13px] text-grey">{hint}</span>}
@@ -79,11 +56,13 @@ export function Field({ label, children, hint, group }: { label: string; childre
   );
 }
 
-export const inputClass = "w-full min-h-11 rounded-[14px] border border-field bg-white px-4 py-2 text-[15px] text-ink placeholder:text-grey";
+export const inputClass = "w-full min-w-0 min-h-11 rounded-[14px] border border-field bg-white px-4 py-2 text-[15px] text-ink placeholder:text-grey";
 
-/** Dates are stored as milliseconds since the epoch. */
-export const fmtDate = (ms: number) => new Date(ms).toISOString().replace("T", " ").slice(0, 16) + " UTC";
+/** A checkbox or radio as a 44 px chip: the input stays a real, focusable control inside its label. */
+export const chipClass =
+  "inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full border border-field bg-white px-4 text-[14px] font-medium text-ink has-[:checked]:border-ink has-[:checked]:bg-ink has-[:checked]:text-white";
 
-export const fmtDay = (ms: number) =>
-  new Date(ms).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+/** Dates come from Postgres as Date objects (UTC). */
+export const fmtDate = (d: Date | null | undefined) => (d ? d.toISOString().replace("T", " ").slice(0, 16) + " UTC" : "–");
 
+export const fmtDay = (d: Date | null | undefined) => (d ? d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }) : "–");
