@@ -46,3 +46,6 @@ next-env.d.ts
 
 # Face matcher weights (pnpm face:models, ~260 MB): never committed
 /.models/
+
+# Local references and screenshots (read-only clones, ref/screens): never committed
+/ref/
