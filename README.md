@@ -175,8 +175,8 @@ pnpm dev                     # http://localhost:3000 → Continue as Brand / Cre
 | `pnpm typecheck && pnpm lint && pnpm build` | checks |
 
 The demo gives each visitor their own workspace (three creators: Rohit and the two synthetic creators, and a demo
-brand) through a cookie. On the Creator page, pick which creator you play. **Reset demo**
-starts a new workspace and deletes nothing.
+brand) through a cookie, kept for 30 days. On the Creator page, pick which creator you play. Nothing is ever
+deleted.
 
 ## Layout
 

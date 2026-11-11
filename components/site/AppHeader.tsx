@@ -1,14 +1,14 @@
 "use client";
 
 /**
- * The app header: home mark, destinations, and the demo persona (Brand or Creator) with Reset demo. The persona
- * tabs and Reset are forms posting the server actions in app/actions.ts, so they work before hydration too.
+ * The app header: home mark, destinations, and the demo persona (Brand or Creator). The persona tabs are forms
+ * posting the server actions in app/actions.ts, so they work before hydration too.
  * `session` is undefined while the session streams in, null without one. AppHeader reads the path for the current
  * tab; HeaderBar is the same bar without it, for Suspense fallbacks (the path is request data on dynamic routes).
  */
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { continueAs, resetDemo } from "@/app/actions";
+import { continueAs } from "@/app/actions";
 import { pillClass } from "@/components/ds";
 import { IconPerson } from "@/components/ds/icons";
 import type { Role } from "@/lib/session";
@@ -58,14 +58,7 @@ export function HeaderBar({ session, path = "" }: { session?: { role: Role } | n
         </nav>
         <div className="ml-auto flex items-center gap-3">
           {session ? (
-            <>
-              <span className="hidden text-[14px] text-grey-dark sm:inline">{role === "creator" ? "Creator" : "Brand"} · demo workspace</span>
-              <form action={resetDemo}>
-                <button title="Start a fresh demo workspace (nothing is deleted)" className={pillClass("white", "min-h-11 cursor-pointer px-4 text-[14px]")}>
-                  Reset demo
-                </button>
-              </form>
-            </>
+            <span className="hidden text-[14px] text-grey-dark sm:inline">{role === "creator" ? "Creator" : "Brand"} · demo workspace</span>
           ) : session === null ? (
             <form action={continueAs.bind(null, "brand")}>
               <button className={pillClass("lime", "min-h-11 cursor-pointer px-5 text-[14px]")}>Continue as Brand</button>

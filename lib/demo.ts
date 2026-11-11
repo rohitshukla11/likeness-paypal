@@ -1,8 +1,8 @@
 import "server-only";
 /**
  * Demo workspaces: each visitor gets an isolated set of rows (a creator "Rohit" with the demo portrait, and a demo
- * brand), so judges never see each other's licences or renders. "Reset demo" starts a new workspace; the old one is
- * left in place, nothing is deleted.
+ * brand), so judges never see each other's licences or renders. A visitor keeps their workspace (a cookie); nothing
+ * is deleted.
  * Each new workspace also gets two SYNTHETIC creators (fictional people with AI-generated faces, lib/personas.ts),
  * so the brand's creator filter has something to filter.
  * For a 3-minute demo each workspace also starts with a mandate (default limits, waiting for a wallet: "Use demo

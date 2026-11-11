@@ -11,11 +11,3 @@ export async function continueAs(role: Role) {
   await setSession(id, role);
   redirect(role === "creator" ? "/creator" : "/brand");
 }
-
-/** "Reset demo": a fresh workspace. The old one stays in the database untouched (nothing is deleted). */
-export async function resetDemo() {
-  const s = await getSession();
-  const ws = await createWorkspace();
-  await setSession(ws.id, s?.role ?? "brand");
-  redirect(s?.role === "creator" ? "/creator" : "/brand");
-}
