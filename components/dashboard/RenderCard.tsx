@@ -7,6 +7,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { pillClass, StatusPill } from "@/components/ds";
 import { CREATOR_LABEL, PayPalIds, pipelineLabel, renderPill, short, STATUS_LABEL, usd, when, type Render } from "./shared";
+import { LabelledVideo } from "./LabelledVideo";
 
 export function RenderCard({
   r,
@@ -29,7 +30,7 @@ export function RenderCard({
 
   const ai = !!r.model && !r.model.startsWith("stub") && !r.model.startsWith("demo clip");
   const media = r.outputRef && r.outputMime === "video/mp4" ? (
-    <video src={r.outputRef} controls muted playsInline preload="metadata" aria-label={`${kind} for ${mode === "brand" ? name : "you"}: ${r.prompt}`} className="aspect-square w-full shrink-0 rounded-[12px] bg-ink object-cover sm:w-[240px]" />
+    <LabelledVideo src={r.outputRef} label={`${kind} for ${mode === "brand" ? name : "you"}: ${r.prompt}`} className="aspect-square w-full shrink-0 rounded-[12px] bg-ink sm:w-[240px]" />
   ) : r.outputRef ? (
     <a href={r.outputRef} target="_blank" rel="noreferrer" className="block shrink-0 rounded-[12px]" aria-label={`Open the full ${kind.toLowerCase()} (new tab)`}>
       {/* Plain <img> as in likeness-ai: a fixed square box, object-cover, so the aspect ratio is never distorted. */}

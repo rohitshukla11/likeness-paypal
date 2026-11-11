@@ -14,7 +14,9 @@ import { brandRenders, brandView } from "@/lib/queries";
 import { getSession } from "@/lib/session";
 import { Notice } from "@/app/notice";
 import Loading from "../../loading";
+import { ethVideoSeconds } from "@/lib/ai/eth";
 import { acceptRender, approveRender, declineRender, rejectRender, startRender } from "./actions";
+import { PromptPreview } from "./prompt-preview";
 import { Countdown } from "./countdown";
 
 export default function StudioPage(props: PageProps<"/brand/studio">) {
@@ -31,6 +33,9 @@ async function Studio({ searchParams }: PageProps<"/brand/studio">) {
   await settle(engineDeps()).catch(() => []);
   const q = await searchParams;
   const [{ brand, mandate: m, wallet, licences, spentToday }, renders] = await Promise.all([brandView(s.brandId), brandRenders(s.brandId)]);
+  // RENDER_PROVIDER=eth: likeness-eth's pipeline (a video makes its own opening still; the exact prompt is shown).
+  const eth = process.env.RENDER_PROVIDER === "eth";
+  const ai = eth || process.env.RENDER_PROVIDER === "gemini";
   const active = licences.filter((l) => l.state === "active");
   const ready = !!wallet && !!m && active.length > 0;
 
@@ -128,7 +133,7 @@ async function Studio({ searchParams }: PageProps<"/brand/studio">) {
               and approve it as the Creator.
             </p>
           ) : null}
-          <form action={startRender} className="flex flex-col gap-3">
+          <form id="render-form" action={startRender} className="flex flex-col gap-3">
             <Field label="Licence and use">
               <select name="licenceUse" className={inputClass} required>
                 {licences
@@ -154,6 +159,7 @@ async function Studio({ searchParams }: PageProps<"/brand/studio">) {
                 ))}
               </div>
             </Field>
+            {!eth && (
             <Field label="Video starts from" hint="A video's first frame is one of your generated ad images under the same licence (not the raw photo).">
               <select name="fromRenderId" className={inputClass} defaultValue="">
                 <option value="">(images: not used)</option>
@@ -166,13 +172,22 @@ async function Studio({ searchParams }: PageProps<"/brand/studio">) {
                   ))}
               </select>
             </Field>
+            )}
             <Field label="Prompt">
               <textarea name="prompt" rows={3} defaultValue="Rohit holding our cold brew on a sunny morning, warm light, clean background" className={inputClass} />
             </Field>
+            {eth && <PromptPreview formId="render-form" seconds={ethVideoSeconds()} />}
             <button className={btnClass("lime", "cursor-pointer self-start")} disabled={!ready}>
               Render
             </button>
-            <p className="m-0 text-[13px] text-grey">Demo renders come from pre-generated images (no AI call, no cost). The PayPal calls are real sandbox calls.</p>
+            <p className="m-0 text-[13px] text-grey">
+              {eth
+                ? `AI renders on the Gemini API with likeness-eth's pipeline: the face is checked and regenerated once if it doesn't match; a video is ${ethVideoSeconds()} s at 16:9 from its own opening still. Over the AI caps a labelled demo stands in.`
+                : ai
+                  ? "AI renders on the Gemini API, within the AI caps; over a cap a labelled demo stands in."
+                  : "Demo renders come from pre-generated images (no AI call, no cost)."}{" "}
+              The PayPal calls are real sandbox calls.
+            </p>
           </form>
         </Panel>
 

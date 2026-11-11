@@ -14,6 +14,7 @@ import { BANNED_USES, USES } from "@/lib/db/schema";
 import { personaOf, portraitUrl, SHARED_PAYOUT_NOTE } from "@/lib/personas";
 import type { creatorView } from "@/lib/queries";
 import { Banner, CHIP, Empty, FaceTile, Fact, MUTED, OUTLINE, OUTLINE_BAD, Panel, Rule, Stat, StatsRow, SURFACE, SyntheticBadge } from "./kit";
+import { LabelledVideo } from "./LabelledVideo";
 
 type View = Awaited<ReturnType<typeof creatorView>>;
 
@@ -157,7 +158,7 @@ export function CreatorHome({ v, notice, reviewEnabled, onboardingLink }: { v: V
               <article key={r.id} className={`${SURFACE} flex min-w-0 flex-col overflow-hidden`}>
                 <div className="bg-paper">
                   {r.outputMime === "video/mp4" ? (
-                    <video src={r.outputRef!} controls muted playsInline preload="metadata" className="aspect-square w-full bg-ink object-cover" />
+                    <LabelledVideo src={r.outputRef!} label={`Video ad for ${brandName}: ${r.prompt}`} className="aspect-square w-full bg-ink" />
                   ) : (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={r.outputRef!} alt={`Ad for ${brandName}: ${r.prompt}`} width={400} height={400} className="aspect-square w-full object-cover" />
