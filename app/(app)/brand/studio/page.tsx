@@ -5,8 +5,8 @@ import { Suspense } from "react";
 import { engineDeps, settle } from "@/lib/engine";
 import { brandRenders, brandView } from "@/lib/queries";
 import { getSession } from "@/lib/session";
-import { Notice } from "../../notice";
-import { Badge, btn, Card, Empty, Field, input, Mono, PageTitle, short, Stat, toneOf, usd, when } from "../../ui";
+import { Notice } from "@/app/notice";
+import { Badge, btn, Card, Empty, Field, input, Mono, PageTitle, short, Stat, toneOf, usd, when } from "@/app/ui";
 import { acceptRender, approveRender, declineRender, rejectRender, startRender } from "./actions";
 import { Countdown } from "./countdown";
 

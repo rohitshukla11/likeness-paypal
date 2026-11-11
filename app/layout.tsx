@@ -2,20 +2,20 @@ import type { Metadata } from "next";
 import { Poppins, Unbounded } from "next/font/google";
 import { SiteFooter } from "@/components/site/SiteFooter";
 import "./globals.css";
-import { Providers } from "./providers";
 
 const display = Unbounded({ subsets: ["latin"], weight: ["700", "800", "900"], variable: "--font-display-face", display: "swap" });
 const body = Poppins({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--font-body-face", display: "swap" });
 
-const TAGLINE = "Your face. Your terms. Get paid per ad.";
-const DESCRIPTION = `${TAGLINE} Creators license their likeness for AI image and video ads, priced by their audience; brands generate consented ads in minutes and pay per render; anyone can verify a file.`;
+const TAGLINE = "License your face to AI ads. Get paid per ad, through PayPal.";
+const DESCRIPTION =
+  "The creator approves a licence once, the brand approves a mandate and saves its PayPal wallet once; every ad is then authorized, rendered, captured, and paid out 90% to the creator or refunded. PayPal sandbox demo.";
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"),
-  title: { default: `Likeness AI: ${TAGLINE}`, template: "%s · Likeness AI" },
+  metadataBase: new URL(process.env.APP_URL || "http://localhost:3000"),
+  title: { default: `Likeness × PayPal: ${TAGLINE}`, template: "%s · Likeness × PayPal" },
   description: DESCRIPTION,
-  openGraph: { type: "website", siteName: "Likeness AI", title: `Likeness AI: ${TAGLINE}`, description: DESCRIPTION },
-  twitter: { card: "summary", title: `Likeness AI: ${TAGLINE}`, description: DESCRIPTION },
+  openGraph: { type: "website", siteName: "Likeness × PayPal", title: `Likeness × PayPal: ${TAGLINE}`, description: DESCRIPTION },
+  twitter: { card: "summary", title: `Likeness × PayPal: ${TAGLINE}`, description: DESCRIPTION },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -28,10 +28,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <a href="#main" className="sr-only z-50 rounded-full bg-lime px-5 py-3 font-semibold text-ink focus:not-sr-only focus:fixed focus:left-4 focus:top-4">
           Skip to content
         </a>
-        <Providers>
-          {children}
-          <SiteFooter />
-        </Providers>
+        {children}
+        <SiteFooter />
       </body>
     </html>
   );

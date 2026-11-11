@@ -1,7 +1,6 @@
 import Link from "next/link";
-import { PRIVACY_URL, TERMS_URL } from "@/lib/site-content";
 
-export const SOURCE_URL = "https://github.com/rohitshukla11/likeness-ai";
+export const SOURCE_URL = "https://github.com/rohitshukla11/likeness-paypal";
 
 /** Footer from the landing mockup, shared by every page. */
 export function SiteFooter() {
@@ -14,30 +13,27 @@ export function SiteFooter() {
             <br />
             LIKENESS IS YOURS
           </h2>
-          <div className="flex flex-col gap-3 text-[15px] text-grey-dark">
-            <span className="text-white">License your face to AI. Your terms, paid per image.</span>
-            <span>Prototype on Google Cloud · demo credits · adults only (self-declared)</span>
+          <div className="flex max-w-[520px] flex-col gap-3 text-[15px] text-grey-dark">
+            <span className="text-white">License your face to AI ads. Get paid per ad, through PayPal.</span>
+            <span>PayPal sandbox only · demo renders are pre-generated images (no AI calls) · built for the PayPal AI Hackathon</span>
           </div>
         </div>
         <div className="flex flex-wrap justify-between gap-4 border-t border-ink-line pt-6 text-[14px] text-grey-dark">
-          <span className="flex flex-wrap gap-6">
-            <Link href="/#how" className="text-grey-dark hover:text-white">
+          <span className="flex flex-wrap gap-x-6 gap-y-1">
+            <Link href="/#how" className="inline-flex min-h-11 items-center text-grey-dark hover:text-white">
               How it works
             </Link>
-            <Link href="/creators" className="text-grey-dark hover:text-white">
-              Creators
+            <Link href="/verify" className="inline-flex min-h-11 items-center text-grey-dark hover:text-white">
+              Verify an ad
             </Link>
-            <a href={PRIVACY_URL} className="text-grey-dark hover:text-white">
-              Privacy
+            <a href="/api/receipts/public-key" className="inline-flex min-h-11 items-center text-grey-dark hover:text-white">
+              Receipt public key
             </a>
-            <a href={TERMS_URL} className="text-grey-dark hover:text-white">
-              Terms
-            </a>
-            <a href={SOURCE_URL} className="text-grey-dark hover:text-white" target="_blank" rel="noreferrer">
+            <a href={SOURCE_URL} className="inline-flex min-h-11 items-center text-grey-dark hover:text-white" target="_blank" rel="noreferrer">
               Source<span className="sr-only"> (opens GitHub)</span>
             </a>
           </span>
-          <span>© 2026 Likeness</span>
+          <span className="inline-flex min-h-11 items-center">© 2026 Likeness</span>
         </div>
       </div>
     </footer>

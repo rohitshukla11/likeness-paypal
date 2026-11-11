@@ -4,7 +4,8 @@ import { btn } from "./ui";
 
 export default function Home() {
   return (
-    <div className="flex flex-col gap-10">
+    <main id="main" className="bg-paper px-4 py-8">
+    <div className="mx-auto flex max-w-6xl flex-col gap-10">
       <section className="grid items-center gap-8 lg:grid-cols-[1.2fr_1fr]">
         <div className="flex flex-col gap-5">
           <span className="w-fit rounded-full bg-brand-soft px-3 py-1 text-xs font-semibold text-brand">PayPal sandbox demo</span>
@@ -50,5 +51,6 @@ export default function Home() {
         ))}
       </section>
     </div>
+    </main>
   );
 }

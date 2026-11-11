@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { btn, Card } from "../../../ui";
+import { btn, Card } from "@/app/ui";
 
 export default function VaultCancel() {
   return (

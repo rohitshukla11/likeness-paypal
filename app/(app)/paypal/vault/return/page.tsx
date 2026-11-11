@@ -5,7 +5,7 @@ import { HttpError } from "@/lib/errors";
 import { PayPalError } from "@/lib/paypal/http";
 import { getSession } from "@/lib/session";
 import { completeWalletSetup } from "@/lib/wallet";
-import { btn, Card, short } from "../../../ui";
+import { btn, Card, short } from "@/app/ui";
 
 /** PayPal sends the brand back here after approving the wallet (redirect flow); the SDK flow lands here too. */
 export default function VaultReturn(props: PageProps<"/paypal/vault/return">) {

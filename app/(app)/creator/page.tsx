@@ -6,8 +6,8 @@ import { BANNED_USES, USES } from "@/lib/db/schema";
 import { engineDeps, settle } from "@/lib/engine";
 import { creatorView } from "@/lib/queries";
 import { getSession } from "@/lib/session";
-import { Notice } from "../notice";
-import { Badge, btn, Card, day, Empty, Field, input, Mono, PageTitle, short, Stat, toneOf, usd } from "../ui";
+import { Notice } from "@/app/notice";
+import { Badge, btn, Card, day, Empty, Field, input, Mono, PageTitle, short, Stat, toneOf, usd } from "@/app/ui";
 import { decideRequest, revokeLicence, saveTerms } from "./actions";
 
 export default function CreatorPage(props: PageProps<"/creator">) {
