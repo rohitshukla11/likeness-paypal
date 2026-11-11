@@ -152,8 +152,9 @@ describe("AI video (Gemini Omni Flash)", () => {
     const client = {
       models: { generateContent: async () => ({ candidates: [{ content: { parts: [{ text: JSON.stringify({ banned: [], fitsCategory: true, reason: "ok" }) }] } }] }) },
       interactions: {
-        create: async (p: { background?: boolean; response_format?: { duration?: string } }) => {
-          calls.push(`create background=${p.background} duration=${p.response_format?.duration}`);
+        create: async (p: { background?: boolean; response_format?: { duration?: string }; generation_config?: { video_config?: { task?: string } }; input?: { type: string; text?: string }[] }) => {
+          calls.push(`create background=${p.background} duration=${p.response_format?.duration} task=${p.generation_config?.video_config?.task}`);
+          calls.push(`text: ${p.input?.find((x) => x.type === "text")?.text?.split("\n")[0]}`);
           return { id: "v1_test", status: "in_progress" };
         },
         get: async () => {
@@ -174,7 +175,13 @@ describe("AI video (Gemini Omni Flash)", () => {
     const out = await imageToVideo({ image: new Uint8Array([1, 2]), mime: "image/jpeg", prompt: "a slow push-in", seconds: 4, pollMs: 1 }, f.client);
     assert.equal(Buffer.from(out.bytes).toString(), "fake-mp4-bytes");
     assert.equal(out.model, "gemini-omni-1.2-flash");
-    assert.deepEqual(f.calls, ["create background=true duration=4s", "get", "get", "get"]);
+    assert.deepEqual(f.calls, [
+      "create background=true duration=4s task=image_to_video",
+      "text: Use this image as the exact first frame of the video and animate the scene from it, keeping the person, their face and the setting as they are.",
+      "get",
+      "get",
+      "get",
+    ]);
   });
 
   it("times out: cancels the job and refuses (the engine then voids)", async () => {
@@ -199,6 +206,7 @@ describe("AI video (Gemini Omni Flash)", () => {
       client: g.client,
       caps: { ...caps, videoTotal: 1 },
       demoClip: async () => new Uint8Array(Buffer.from("saved-clip")),
+      firstFrame: async () => (await ref())[0],
       video: async () => (videoCalls++, { bytes: new Uint8Array([9]), mime: "video/mp4", model: "gemini-omni-1.2-flash" }),
     });
     const first = await p.render(input({ kind: "video" }));
@@ -214,7 +222,7 @@ describe("AI video (Gemini Omni Flash)", () => {
     const g = await fakeGemini();
     const t = testEngine({
       mandate: { stepUpThresholdCents: 1000 }, // $6.00 is under the threshold here, so it runs at once
-      provider: new AiProvider({ quota: new MemoryQuota(), stub: new StubProvider(), references: ref, client: g.client, caps, video: async () => Promise.reject(new Error("Omni Flash took longer than 300 s; cancelled")) }),
+      provider: new AiProvider({ quota: new MemoryQuota(), stub: new StubProvider(), references: ref, client: g.client, caps, firstFrame: async () => (await ref())[0], video: async () => Promise.reject(new Error("Omni Flash took longer than 300 s; cancelled")) }),
     });
     const r = await renderAndPay({ renderId: "rnd_v1", licenceId: "lic_1", mandateId: "man_1", kind: "video", use: "advertising", prompt: "Rohit with headphones" }, t.deps);
     assert.equal(r.status, "voided");
@@ -223,5 +231,33 @@ describe("AI video (Gemini Omni Flash)", () => {
       t.calls.map((c) => c.op),
       ["createVaultOrder", "voidAuthorization"],
     );
+  });
+});
+
+describe("AI video starts from the generated ad image", () => {
+  it("passes the ad image (not the reference photo) as the first frame", async () => {
+    const g = await fakeGemini();
+    const ad = { bytes: new Uint8Array([7, 7, 7]), mime: "image/jpeg" as const };
+    let got: Uint8Array | null = null;
+    const p = new AiProvider({
+      quota: new MemoryQuota(),
+      stub: new StubProvider(),
+      references: ref,
+      client: g.client,
+      caps,
+      firstFrame: async (i) => (i.fromRenderId === "rnd_img" ? ad : null),
+      video: async (_i, still) => ((got = still.bytes), { bytes: new Uint8Array([1]), mime: "video/mp4", model: "gemini-omni-1.2-flash" }),
+    });
+    await p.render(input({ kind: "video", fromRenderId: "rnd_img" }));
+    assert.deepEqual(got, ad.bytes);
+  });
+  it("without a generated ad to start from: no AI call, a labelled stand-in", async () => {
+    const g = await fakeGemini();
+    let videoCalls = 0;
+    const p = new AiProvider({ quota: new MemoryQuota(), stub: new StubProvider(), references: ref, client: g.client, caps, firstFrame: async () => null, demoClip: async () => null, video: async () => (videoCalls++, { bytes: new Uint8Array([1]), mime: "video/mp4", model: "x" }) });
+    const out = await p.render(input({ kind: "video" }));
+    assert.equal(videoCalls, 0);
+    assert.equal(g.calls.length, 0);
+    assert.match(out.note!, /starts from a generated ad image/);
   });
 });

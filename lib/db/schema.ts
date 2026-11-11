@@ -219,6 +219,8 @@ export const renders = pgTable(
     mandateId: text("mandate_id").notNull().references(() => mandates.id),
     /** image | video */
     kind: text("kind").notNull(),
+    /** Video only: the generated ad image (an earlier image render under the same licence) used as its first frame. */
+    fromRenderId: text("from_render_id").references((): AnyPgColumn => renders.id),
     use: text("use").notNull(),
     prompt: text("prompt").notNull(),
     promptSha256: text("prompt_sha256").notNull(),

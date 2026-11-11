@@ -1,0 +1,2 @@
+ALTER TABLE "renders" ADD COLUMN "from_render_id" text;--> statement-breakpoint
+ALTER TABLE "renders" ADD CONSTRAINT "renders_from_render_id_renders_id_fk" FOREIGN KEY ("from_render_id") REFERENCES "public"."renders"("id") ON DELETE no action ON UPDATE no action;

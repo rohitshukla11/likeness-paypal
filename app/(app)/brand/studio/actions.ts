@@ -22,13 +22,15 @@ export async function startRender(form: FormData) {
   const s = await me();
   const [licenceId, use] = String(form.get("licenceUse") ?? "").split("|");
   const kind = form.get("kind") === "video" ? "video" : "image";
+  const fromRenderId = kind === "video" ? String(form.get("fromRenderId") ?? "") || null : null;
   const prompt = String(form.get("prompt") ?? "").trim();
   if (prompt.length < 5 || prompt.length > 1000) back({ error: "Write a prompt of 5 to 1000 characters" });
   const [l] = await db().select().from(licences).where(and(eq(licences.id, licenceId ?? ""), eq(licences.brandId, s.brandId)));
   if (!l) back({ error: "Choose one of your licences" });
   const [m] = await db().select().from(mandates).where(and(eq(mandates.brandId, s.brandId), ne(mandates.status, "revoked"))).orderBy(desc(mandates.createdAt)).limit(1);
   if (!m) back({ error: "Save a mandate on the brand page first" });
-  const r = await renderAndPay({ renderId: newId("rnd"), licenceId: l.id, mandateId: m.id, kind, use: use || l.allowedUses[0], prompt }, engineDeps());
+  if (kind === "video" && fromRenderId && !(await renderOfBrand(fromRenderId, s.brandId))) back({ error: "Choose one of your own ad images to start the video from" });
+  const r = await renderAndPay({ renderId: newId("rnd"), licenceId: l.id, mandateId: m.id, kind, fromRenderId, use: use || l.allowedUses[0], prompt }, engineDeps());
   revalidatePath("/brand/studio");
   if (r.status === "refused") back({ error: `Refused before any PayPal call: ${r.error ?? "policy"}` });
   if (r.status === "needs_brand_approval") back({ ok: "This render is above your step-up threshold: approve it below to charge it." });

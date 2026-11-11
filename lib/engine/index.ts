@@ -10,7 +10,7 @@ import { DrizzleQuota } from "../ai/quota-store";
 import { createHash } from "node:crypto";
 import { c2paConfigured, embedManifest } from "../ai/c2pa";
 import { veoPrompt } from "../ai/creative";
-import { demoClip, referencePhotos } from "../ai/reference";
+import { adImage, demoClip, referencePhotos } from "../ai/reference";
 import { imageToVideo } from "../ai/render-video";
 import { StubProvider, type RenderProvider } from "./providers";
 import type { EngineDeps, PayPalPort } from "./render-and-pay";
@@ -28,6 +28,7 @@ export function providerFromEnv(env: NodeJS.ProcessEnv = process.env): RenderPro
     stub,
     references: (i) => referencePhotos(i.creatorPhotoRef, { renderId: i.renderId, licenceId: i.licenceId }),
     demoClip,
+    firstFrame: (i) => adImage(i.fromRenderId, i.licenceId),
     video: (i, still) => imageToVideo({ image: still.bytes, mime: still.mime, prompt: veoPrompt(i.prompt, "9:16"), aspectRatio: "9:16" }),
     credential: c2paConfigured()
       ? (bytes, mime, i, model) =>

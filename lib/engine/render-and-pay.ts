@@ -54,6 +54,7 @@ export interface RenderRow {
   licenceId: string;
   mandateId: string;
   kind: "image" | "video";
+  fromRenderId: string | null;
   use: string;
   prompt: string;
   promptSha256: string;
@@ -93,6 +94,8 @@ export interface RenderRequest {
   licenceId: string;
   mandateId: string;
   kind: "image" | "video";
+  /** Video only: the image render whose generated ad is the first frame. */
+  fromRenderId?: string | null;
   use: string;
   prompt: string;
 }
@@ -167,7 +170,7 @@ export async function approveStepUp(renderId: string, deps: EngineDeps): Promise
   const r = await deps.store.getRender(renderId);
   if (!r) throw new Error("no such render");
   if (r.status !== "needs_brand_approval") return resume(r, deps);
-  const { render } = await admit({ renderId, licenceId: r.licenceId, mandateId: r.mandateId, kind: r.kind, use: r.use, prompt: r.prompt }, deps, true);
+  const { render } = await admit({ renderId, licenceId: r.licenceId, mandateId: r.mandateId, kind: r.kind, fromRenderId: r.fromRenderId, use: r.use, prompt: r.prompt }, deps, true);
   return resume(render, deps);
 }
 
@@ -238,7 +241,7 @@ async function authorize(r: RenderRow, deps: EngineDeps): Promise<RenderRow> {
 async function produce(r: RenderRow, deps: EngineDeps): Promise<RenderRow> {
   const ctx = await deps.store.context(r.id);
   try {
-    const out = await deps.provider.render({ renderId: r.id, kind: r.kind, prompt: r.prompt, use: r.use, workspaceId: ctx.creator.workspaceId, creatorPhotoRef: ctx.creator.photoRef, licenceId: r.licenceId, orderId: r.orderId, authorizationId: r.authorizationId });
+    const out = await deps.provider.render({ renderId: r.id, kind: r.kind, prompt: r.prompt, use: r.use, workspaceId: ctx.creator.workspaceId, creatorPhotoRef: ctx.creator.photoRef, licenceId: r.licenceId, fromRenderId: r.fromRenderId, orderId: r.orderId, authorizationId: r.authorizationId });
     const check = await deps.compliance.check({ renderId: r.id, use: r.use, prompt: r.prompt, output: out });
     if (!check.ok) return fail(r, deps, "voided", "compliance_failed", check.reason, true);
     let outputRef = out.outputRef;

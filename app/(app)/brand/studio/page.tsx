@@ -94,6 +94,18 @@ async function Studio({ searchParams }: PageProps<"/brand/studio">) {
                 ))}
               </div>
             </Field>
+            <Field label="Video starts from" hint="A video's first frame is one of your generated ad images under the same licence (not the raw photo).">
+              <select name="fromRenderId" className={inputClass} defaultValue="">
+                <option value="">(images: not used)</option>
+                {renders
+                  .filter(({ render: r }) => r.kind === "image" && r.outputRef?.startsWith("/media/") && !!r.captureId)
+                  .map(({ render: r }) => (
+                    <option key={r.id} value={r.id}>
+                      Image of {r.createdAt.toISOString().slice(0, 16).replace("T", " ")} · &ldquo;{r.prompt.slice(0, 40)}&rdquo;
+                    </option>
+                  ))}
+              </select>
+            </Field>
             <Field label="Prompt">
               <textarea name="prompt" rows={3} defaultValue="Rohit holding our cold brew on a sunny morning, warm light, clean background" className={inputClass} />
             </Field>

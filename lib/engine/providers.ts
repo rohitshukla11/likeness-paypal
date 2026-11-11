@@ -19,6 +19,8 @@ export interface RenderInput {
   workspaceId: string | null;
   /** The licence and the PayPal authorization the render is made under (named in its content credential). */
   licenceId?: string;
+  /** Video only: the generated ad image render to start from (its first frame). */
+  fromRenderId?: string | null;
   orderId?: string | null;
   authorizationId?: string | null;
   /** The creator's reference photo (path under public/ or a storage key). */

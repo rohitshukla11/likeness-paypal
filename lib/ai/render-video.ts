@@ -1,7 +1,9 @@
 import "server-only";
 /**
  * AI video ads on the Gemini API (GEMINI_API_KEY), image to video: Gemini Omni Flash (gemini-omni-1.2-flash)
- * through the Interactions API, run in the background and polled until done or the timeout.
+ * through the Interactions API, run in the background and polled until done or the timeout. The still is the
+ * generated ad image, used as the first frame: the prompt says so, and video_config.task is "image_to_video"
+ * (Omni's documented way to lock image-to-video when the role of an input image must not be inferred).
  *
  * Why not Veo: Veo's previews on the Gemini API (veo-3.1-*-preview) were shut down on 2026-10-22 and Veo 2.0 on
  * 2026-06-30; Veo GA is only on Google's enterprise platform (Vertex), which this app doesn't use. Omni Flash is
@@ -44,8 +46,9 @@ export async function imageToVideo(
         model,
         input: [
           { type: "image", data: Buffer.from(input.image).toString("base64"), mime_type: input.mime },
-          { type: "text", text: input.prompt },
+          { type: "text", text: `Use this image as the exact first frame of the video and animate the scene from it, keeping the person, their face and the setting as they are.\n${input.prompt}` },
         ],
+        generation_config: { video_config: { task: "image_to_video" } },
         response_format: { type: "video", duration: `${input.seconds ?? videoSeconds()}s`, resolution: "720p", aspect_ratio: input.aspectRatio ?? "9:16" },
         background: true,
       },

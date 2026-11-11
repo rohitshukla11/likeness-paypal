@@ -49,3 +49,21 @@ export async function demoClip(): Promise<Uint8Array | null> {
     return null;
   }
 }
+
+/**
+ * A video's first frame: the generated ad image of an earlier image render under the same licence (an AI image,
+ * not a demo stand-in), as stored and served at /media/<render id>.
+ */
+export async function adImage(fromRenderId: string | null | undefined, licenceId: string | undefined): Promise<Reference | null> {
+  if (!fromRenderId || !licenceId) return null;
+  const { and, eq } = await import("drizzle-orm");
+  const { db } = await import("../db");
+  const { renderMedia, renders } = await import("../db/schema");
+  const [r] = await db()
+    .select({ model: renders.model, kind: renders.kind, mime: renderMedia.mime, bytes: renderMedia.bytes })
+    .from(renders)
+    .innerJoin(renderMedia, eq(renderMedia.renderId, renders.id))
+    .where(and(eq(renders.id, fromRenderId), eq(renders.licenceId, licenceId)));
+  if (!r || r.kind !== "image" || !r.model?.startsWith("gemini") || (r.mime !== "image/jpeg" && r.mime !== "image/png")) return null;
+  return { bytes: new Uint8Array(r.bytes), mime: r.mime };
+}

@@ -42,7 +42,7 @@ export class DrizzleStore implements EngineStore {
       } else {
         [row] = await tx
           .insert(renders)
-          .values({ id: req.renderId, licenceId: req.licenceId, mandateId: req.mandateId, kind: req.kind, use: req.use, prompt: req.prompt, promptSha256: promptHash(req.prompt), ...values })
+          .values({ id: req.renderId, licenceId: req.licenceId, mandateId: req.mandateId, kind: req.kind, fromRenderId: req.fromRenderId ?? null, use: req.use, prompt: req.prompt, promptSha256: promptHash(req.prompt), ...values })
           .returning();
       }
       if (reserve) {

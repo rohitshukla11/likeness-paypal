@@ -24,7 +24,9 @@ export interface AiProviderDeps {
   stub: RenderProvider;
   /** The creator's reference photos for this render (empty: none on file). */
   references: (input: RenderInput) => Promise<Reference[]>;
-  /** A real video (lib/ai/render-video.ts). Absent: videos always use the fallback. */
+  /** Video: the generated ad image (an image render under the same licence) that is the first frame. */
+  firstFrame?: (input: RenderInput) => Promise<Reference | null>;
+  /** A real video (lib/ai/render-video.ts), started from `still`. Absent: videos always use the fallback. */
   video?: (input: RenderInput, still: Reference) => Promise<{ bytes: Uint8Array; mime: "video/mp4"; model: string }>;
   /** The saved demo clip played back over the video cap (private/demo-video.mp4), or null if there is none. */
   demoClip?: () => Promise<Uint8Array | null>;
@@ -77,13 +79,14 @@ export class AiProvider implements RenderProvider {
     };
     if (!this.deps.video) return clip("Demo render: AI video isn't enabled.");
     if (!this.deps.client && !geminiConfigured()) return clip("Demo render: Gemini isn't configured (GEMINI_API_KEY).");
-    const refs = await this.deps.references(input);
-    if (!refs.length) return clip("Demo render: there is no reference photo of this creator on file.");
+    // A video starts from a generated ad image under the same licence (its first frame), never the raw photo.
+    const still = (await this.deps.firstFrame?.(input)) ?? null;
+    if (!still) return clip("Demo render: a video starts from a generated ad image under this licence, and there is none to start from.");
     const caps = this.caps;
     if (!(await this.deps.quota.reserve(videoKeys(caps)))) return clip(`Demo render: the AI video cap (${caps.videoTotal} in total) is reached.`);
     const filter = await checkPrompt(input.prompt, input.use, this.deps.client);
     if (!filter.allowed) throw new Error(`refused by the safety filter: ${filter.reasons.join("; ")}`);
-    const out = await this.deps.video(input, refs[0]);
+    const out = await this.deps.video(input, still);
     const bytes = this.deps.credential ? this.deps.credential(out.bytes, "video/mp4", input, out.model) : out.bytes;
     return { outputRef: "", bytes, sha256: sha(bytes), mime: out.mime, model: out.model, note: "AI-generated video. The AI label is shown with the video and in its receipt (no ffmpeg here to burn it in)." };
   }
