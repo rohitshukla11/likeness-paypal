@@ -5,8 +5,8 @@
 **Live (PayPal sandbox):** https://likeness-r2t7.onrender.com. No sign-up: each visitor gets a private demo workspace,
 with a creator (Rohit) who has already approved one licence for the demo brand.
 
-New workspaces also get two **synthetic creators**, so the **Creators** page (**Find creators** on the Brand page: a search box with a Search button and filters)
-has something to filter. Rohit's card shows his real photo; the synthetic creators show their AI-generated faces:
+New workspaces also get two **synthetic creators**, so the Brand page's **Creators** section (a search box with a Search button, filters, and the results right
+there) has something to filter. Rohit's card shows his real photo; the synthetic creators show their AI-generated faces:
 
 | Creator | | Niche | Price | Allowed uses | Per licence | Demo brand |
 |---|---|---|---|---|---|---|

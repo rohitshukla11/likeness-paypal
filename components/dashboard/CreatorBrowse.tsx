@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * The Creators page (/creators, opened with "Find creators" on the Brand page), adapted from likeness-eth
+ * The Creators section of the Brand page (#creators; "Find creators" scrolls to it), adapted from likeness-eth
  * (FaceVisa)'s Creators page: a search box with a Search button, then a white header surface with
  * count chips, then a grid of creator cards (portrait, name, labels, Image / Video / Up to facts, terms, an action).
  * Added here: filters for niche, price per image, allowed use, video or images only and licence status, plus a name
@@ -32,7 +32,7 @@ export function CreatorBrowse({ cards, requestBase, studioHref = "/brand/studio"
   const licensed = cards.filter((c) => c.licence === "licensed").length;
 
   return (
-    <section className="flex flex-col gap-3" aria-label="Creators">
+    <section id="creators" className="flex scroll-mt-4 flex-col gap-3" aria-label="Creators">
       <div className={`${SURFACE} flex flex-col gap-4 p-5 sm:p-6`}>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div className="flex min-w-0 flex-col gap-1">

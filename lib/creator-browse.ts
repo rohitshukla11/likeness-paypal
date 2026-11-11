@@ -1,6 +1,6 @@
 /**
  * The brand's view of the creators it can license, and the filter over them. One shape and one filter for both the
- * Creators page (/creators, "Find creators" on the Brand page) and the brand agent's list_creators tool, so "find me a fitness creator under $3"
+ * Brand page's Creators section (search and filters) and the brand agent's list_creators tool, so "find me a fitness creator under $3"
  * gives the agent exactly what the page would show. Pure (no I/O): lib/queries.ts builds the cards.
  */
 import { allowsVideo, nicheOf, personaOf, portraitUrl, SYNTHETIC_LABEL } from "./personas";

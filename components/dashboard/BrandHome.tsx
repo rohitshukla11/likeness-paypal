@@ -13,6 +13,7 @@ import { chipClass, Field, fmtDay, inputClass, StatusBadge } from "@/components/
 import type { brandRenders, brandView } from "@/lib/queries";
 import { IconSearch } from "@/components/ds/icons";
 import { isSynthetic, portraitUrl, SHARED_PAYOUT_NOTE } from "@/lib/personas";
+import { CreatorBrowse } from "./CreatorBrowse";
 import { Banner, CHIP, Empty, Fact, MUTED, Monogram, OUTLINE, Panel, Stat, StatsRow, SURFACE, SyntheticBadge } from "./kit";
 
 type View = Awaited<ReturnType<typeof brandView>>;
@@ -47,10 +48,10 @@ export function BrandHome({ v, renders, notice, demoWallet, picked }: { v: View;
         }
         actions={
           <>
-            <Link href="/creators" className={btnClass("lime", "gap-2")}>
+            <a href="#creators" className={btnClass("lime", "gap-2")}>
               <IconSearch size={18} />
               Find creators
-            </Link>
+            </a>
             <Link href="/brand/studio" className={OUTLINE}>
               Open Studio
             </Link>
@@ -130,6 +131,8 @@ export function BrandHome({ v, renders, notice, demoWallet, picked }: { v: View;
         </div>
       </Panel>
 
+      <CreatorBrowse cards={v.cards} requestBase="/brand?creator=" />
+
       <div className="grid grid-cols-1 items-start gap-[18px] lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
         <Panel tone="surface" title="Request a licence" id="request">
           {!req ? (
@@ -147,7 +150,7 @@ export function BrandHome({ v, renders, notice, demoWallet, picked }: { v: View;
                 </div>
               </div>
               {isSynthetic(req.photoRef) && <SyntheticBadge />}
-              {creators.length > 1 && <p className={`m-0 text-[13px] ${MUTED}`}>Pick another creator on the <Link href="/creators" className="font-semibold text-ink underline">Creators</Link> page.</p>}
+              {creators.length > 1 && <p className={`m-0 text-[13px] ${MUTED}`}>Pick another creator in <a href="#creators" className="font-semibold text-ink underline">Creators</a> above.</p>}
               <Field label="Uses" group>
                 <div className="flex flex-wrap gap-2">
                   {req.allowedUses.map((u) => (

@@ -113,7 +113,7 @@ export async function runBrandAgent(input: { workspaceId: string; brandId: strin
     },
     {
       name: "list_creators",
-      description: "The creators this brand can license, filtered: niche, price per image, allowed use, video or images only, licensed or not, name. The same list and filters as the Creators page's creator browser.",
+      description: "The creators this brand can license, filtered: niche, price per image, allowed use, video or images only, licensed or not, name. The same list and filters as the Brand page's creator browser.",
       parameters: {
         type: "object",
         properties: {
