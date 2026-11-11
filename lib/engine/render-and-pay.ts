@@ -55,6 +55,7 @@ export interface RenderRow {
   mandateId: string;
   kind: "image" | "video";
   fromRenderId: string | null;
+  aspect: string | null;
   use: string;
   prompt: string;
   promptSha256: string;
@@ -96,6 +97,8 @@ export interface RenderRequest {
   kind: "image" | "video";
   /** Video only: the image render whose generated ad is the first frame. */
   fromRenderId?: string | null;
+  /** Image aspect ratio (default 1:1). */
+  aspect?: "1:1" | "9:16" | "16:9" | null;
   use: string;
   prompt: string;
 }
@@ -133,7 +136,15 @@ export interface EngineStore {
   due(now: Date, staleMs: number): Promise<string[]>;
 }
 
+/** One step of a render, as it happens (the brand agent's chat shows these live). */
+export type StepName = "prompt_check" | "policy" | "authorize" | "render" | "compliance" | "capture" | "review" | "payout" | "refund" | "receipt";
+export type StepEvent = { renderId: string; step: StepName; status: "ok" | "refused" | "failed" | "waiting"; detail: string; ids?: Record<string, string | null> };
+
 export interface EngineDeps {
+  /** Live progress, one event per step (optional). */
+  onStep?: (e: StepEvent) => void;
+  /** Before any money moves: the prompt check. A refusal records a refused render and makes no PayPal call. */
+  precheck?: (req: RenderRequest) => Promise<{ ok: true; detail?: string } | { ok: false; reason: string; detail: string }>;
   store: EngineStore;
   paypal: PayPalPort;
   provider: RenderProvider;
@@ -155,12 +166,32 @@ function describe(e: unknown): string {
   return s.startsWith("Error: ") ? s.slice(7) : s;
 }
 
+const emit = (deps: EngineDeps, e: StepEvent) => {
+  try {
+    deps.onStep?.(e);
+  } catch {
+    // a listener's failure never stops a render
+  }
+};
+const usd = (c: number) => `$${(c / 100).toFixed(2)}`;
+const FAIL_STEP: Record<string, StepName> = { paypal_authorize_failed: "authorize", render_failed: "render", compliance_failed: "compliance", capture_failed: "capture" };
+
 // ---------------------------------------------------------------- 1. Policy
 
 /** Runs the whole pipeline for a new render (or resumes it). Returns the render as it stands afterwards. */
 export async function renderAndPay(req: RenderRequest, deps: EngineDeps): Promise<RenderRow> {
   const existing = await deps.store.getRender(req.renderId);
   if (existing) return resume(existing, deps);
+  if (deps.precheck) {
+    const p = await deps.precheck(req);
+    if (!p.ok) {
+      // Refused before any money moves: recorded like a policy refusal, with zero PayPal calls.
+      emit(deps, { renderId: req.renderId, step: "prompt_check", status: "refused", detail: p.detail });
+      const { render } = await deps.store.admit(req, { dayStart: utcDayStart(deps.now()), stepUpApproved: false }, () => ({ status: "refused", amountCents: 0, refusal: { reason: p.reason, detail: p.detail } }));
+      return render;
+    }
+    emit(deps, { renderId: req.renderId, step: "prompt_check", status: "ok", detail: p.detail ?? "the prompt is within the licence and the banned-use rules" });
+  }
   const { render } = await admit(req, deps, false);
   return resume(render, deps);
 }
@@ -170,7 +201,7 @@ export async function approveStepUp(renderId: string, deps: EngineDeps): Promise
   const r = await deps.store.getRender(renderId);
   if (!r) throw new Error("no such render");
   if (r.status !== "needs_brand_approval") return resume(r, deps);
-  const { render } = await admit({ renderId, licenceId: r.licenceId, mandateId: r.mandateId, kind: r.kind, fromRenderId: r.fromRenderId, use: r.use, prompt: r.prompt }, deps, true);
+  const { render } = await admit({ renderId, licenceId: r.licenceId, mandateId: r.mandateId, kind: r.kind, fromRenderId: r.fromRenderId, aspect: (r.aspect as RenderRequest["aspect"]) ?? null, use: r.use, prompt: r.prompt }, deps, true);
   return resume(render, deps);
 }
 
@@ -183,12 +214,19 @@ export async function declineStepUp(renderId: string, deps: EngineDeps): Promise
 
 async function admit(req: RenderRequest, deps: EngineDeps, stepUpApproved: boolean) {
   const now = deps.now();
-  return deps.store.admit(req, { dayStart: utcDayStart(now), stepUpApproved }, (l, m, spentTodayCents) => {
+  let code = "";
+  const res = await deps.store.admit(req, { dayStart: utcDayStart(now), stepUpApproved }, (l, m, spentTodayCents) => {
     const v: Verdict = checkRender(l, m, { kind: req.kind, use: req.use, spentTodayCents, stepUpApproved, now });
     if (v.ok === true) return { status: "authorizing", amountCents: v.amountCents, reserve: true };
     if (v.ok === "step_up") return { status: "needs_brand_approval", amountCents: v.amountCents };
+    code = v.code;
     return { status: "refused", amountCents: 0, refusal: { reason: v.code, detail: v.reason } };
   });
+  const r = res.render;
+  if (r.status === "refused") emit(deps, { renderId: r.id, step: "policy", status: "refused", detail: r.error ?? "refused", ids: { reason: code || null } });
+  else if (r.status === "needs_brand_approval") emit(deps, { renderId: r.id, step: "policy", status: "waiting", detail: `${usd(r.amountCents)} is above your step-up threshold: approve it first` });
+  else if (r.status === "authorizing") emit(deps, { renderId: r.id, step: "policy", status: "ok", detail: `licence active, use allowed, within your mandate: ${usd(r.amountCents)}` });
+  return res;
 }
 
 /** Continues a render from its stored status up to the review window (or a terminal status). */
@@ -229,6 +267,7 @@ async function authorize(r: RenderRow, deps: EngineDeps): Promise<RenderRow> {
     if (!auth) throw new Error(`order ${order.id} has no authorization (status ${order.status})`);
     if (auth.status !== "CREATED" && auth.status !== "PENDING") throw new Error(`authorization ${auth.id} is ${auth.status}`);
     await deps.store.recordOrder({ orderId: order.id, paymentTokenId: ctx.paymentTokenId, status: order.status, authorizationId: auth.id, authorizationStatus: auth.status, amountCents: r.amountCents, customId: r.id });
+    emit(deps, { renderId: r.id, step: "authorize", status: "ok", detail: `${usd(r.amountCents)} authorized on your saved PayPal wallet`, ids: { order: order.id, authorization: auth.id } });
     return (await deps.store.update(r.id, { status: "rendering", orderId: order.id, authorizationId: auth.id }, ["authorizing"])) ?? (await mustGet(r.id, deps));
   } catch (e) {
     // Nothing to void: no authorization exists. Give the reservation back.
@@ -241,9 +280,11 @@ async function authorize(r: RenderRow, deps: EngineDeps): Promise<RenderRow> {
 async function produce(r: RenderRow, deps: EngineDeps): Promise<RenderRow> {
   const ctx = await deps.store.context(r.id);
   try {
-    const out = await deps.provider.render({ renderId: r.id, kind: r.kind, prompt: r.prompt, use: r.use, workspaceId: ctx.creator.workspaceId, creatorPhotoRef: ctx.creator.photoRef, licenceId: r.licenceId, fromRenderId: r.fromRenderId, orderId: r.orderId, authorizationId: r.authorizationId });
-    const check = await deps.compliance.check({ renderId: r.id, use: r.use, prompt: r.prompt, output: out });
+    const out = await deps.provider.render({ renderId: r.id, kind: r.kind, prompt: r.prompt, use: r.use, workspaceId: ctx.creator.workspaceId, creatorPhotoRef: ctx.creator.photoRef, licenceId: r.licenceId, fromRenderId: r.fromRenderId, aspect: (r.aspect as RenderRequest["aspect"]) ?? null, orderId: r.orderId, authorizationId: r.authorizationId });
+    emit(deps, { renderId: r.id, step: "render", status: "ok", detail: `${r.kind} made with ${out.model}${out.note ? ` (${out.note})` : ""}` });
+    const check = await deps.compliance.check({ renderId: r.id, use: r.use, prompt: r.prompt, output: out, creatorPhotoRef: ctx.creator.photoRef });
     if (!check.ok) return fail(r, deps, "voided", "compliance_failed", check.reason, true);
+    emit(deps, { renderId: r.id, step: "compliance", status: "ok", detail: check.note ?? "passed" });
     let outputRef = out.outputRef;
     if (out.bytes) {
       await deps.store.saveMedia(r.id, { bytes: out.bytes, mime: out.mime, sha256: out.sha256 });
@@ -266,6 +307,8 @@ async function capture(r: RenderRow, deps: EngineDeps): Promise<RenderRow> {
     if (c.status !== "COMPLETED" && c.status !== "PENDING") throw new Error(`capture ${c.id} is ${c.status}`);
     const deadline = new Date(deps.now().getTime() + deps.reviewWindowSeconds * 1000);
     await deps.store.recordOrder({ orderId: r.orderId!, paymentTokenId: null, status: "CAPTURED", authorizationId: r.authorizationId, authorizationStatus: "CAPTURED", captureId: c.id, amountCents: r.amountCents, customId: r.id });
+    emit(deps, { renderId: r.id, step: "capture", status: "ok", detail: `${usd(r.amountCents)} captured`, ids: { capture: c.id } });
+    emit(deps, { renderId: r.id, step: "review", status: "waiting", detail: `accept or reject within ${Math.round(deps.reviewWindowSeconds / 60)} min: accept pays the creator 90% and signs the receipt; no answer auto-accepts`, ids: { deadline: deadline.toISOString() } });
     return (await deps.store.update(r.id, { status: "in_review", captureId: c.id, reviewDeadline: deadline }, ["capturing"])) ?? (await mustGet(r.id, deps));
   } catch (e) {
     return fail(r, deps, "voided", "capture_failed", describe(e), true);
@@ -285,6 +328,7 @@ async function fail(r: RenderRow, deps: EngineDeps, status: "voided" | "failed",
   }
   const updated = await deps.store.update(r.id, { status, error: note }, [r.status]);
   if (!updated) return mustGet(r.id, deps); // someone else moved it on
+  emit(deps, { renderId: r.id, step: FAIL_STEP[reason] ?? "render", status: "failed", detail: `${note}${voidAuth && r.authorizationId ? "; the authorization was voided, so you were not charged" : "; you were not charged"}` });
   if (r.reserved) await deps.store.release(r.id, { render: true });
   await deps.store.refuse({ renderId: r.id, licenceId: r.licenceId, mandateId: r.mandateId, reason, detail: note });
   return (await deps.store.getRender(r.id))!;
@@ -343,6 +387,7 @@ async function decide(renderId: string, decision: "accept" | "reject" | "auto_ac
       const batch = await deps.paypal.createPayout({ senderBatchId: renderId, receiverEmail: email, amount: cents(creatorCents), note: `Your 90% of licensed render ${renderId}`, senderItemId: renderId });
       await deps.store.recordPayout({ senderBatchId: renderId, payoutBatchId: batch.batch_header.payout_batch_id, receiverEmail: email, amountCents: creatorCents, status: batch.batch_header.batch_status });
       r = (await deps.store.update(renderId, { status: "accepted", payoutBatchId: batch.batch_header.payout_batch_id, payoutSenderBatchId: renderId, creatorPayoutCents: creatorCents, platformFeeCents: feeCents, error: null }, ["settling"]))!;
+      emit(deps, { renderId, step: "payout", status: "ok", detail: `${usd(creatorCents)} paid to the creator (90%)`, ids: { payout: batch.batch_header.payout_batch_id } });
     } catch (e) {
       await deps.store.update(renderId, { error: `payout failed: ${describe(e)}` });
       throw e;
@@ -352,6 +397,7 @@ async function decide(renderId: string, decision: "accept" | "reject" | "auto_ac
       const refund = await deps.paypal.refundCapture(r.captureId!, { note: "The brand rejected this render" }, { requestId: `${renderId}-refund` });
       await deps.store.recordOrder({ orderId: r.orderId!, paymentTokenId: null, status: "REFUNDED", authorizationId: r.authorizationId, authorizationStatus: "CAPTURED", captureId: r.captureId, refundId: refund.id, amountCents: r.amountCents, customId: renderId });
       r = (await deps.store.update(renderId, { status: "rejected", refundId: refund.id, creatorPayoutCents: 0, platformFeeCents: 0, error: null }, ["refunding"]))!;
+      emit(deps, { renderId, step: "refund", status: "ok", detail: `${usd(r.amountCents)} refunded to your PayPal`, ids: { refund: refund.id } });
       // The money is back with the brand: release the spend; the render still counts against the licence.
       if (r.reserved) await deps.store.release(renderId, { render: false });
     } catch (e) {
@@ -396,6 +442,7 @@ async function signReceipt(r: RenderRow, deps: EngineDeps) {
     settledAt: (r.decidedAt ?? deps.now()).toISOString(),
   };
   await deps.store.saveReceipt(r.id, deps.sign(payload));
+  emit(deps, { renderId: r.id, step: "receipt", status: "ok", detail: `receipt signed (${payload.status})`, ids: { receipt: payload.receiptId } });
 }
 
 async function mustGet(id: string, deps: EngineDeps) {

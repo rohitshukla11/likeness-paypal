@@ -21,6 +21,8 @@ export interface RenderInput {
   licenceId?: string;
   /** Video only: the generated ad image render to start from (its first frame). */
   fromRenderId?: string | null;
+  /** Image aspect ratio (default 1:1). */
+  aspect?: "1:1" | "9:16" | "16:9" | null;
   orderId?: string | null;
   authorizationId?: string | null;
   /** The creator's reference photo (path under public/ or a storage key). */

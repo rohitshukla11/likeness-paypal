@@ -4,6 +4,9 @@ import { newId } from "../errors";
 import { authorizeOrder, captureAuthorization, createVaultOrder, refundCapture, voidAuthorization } from "../paypal/orders";
 import { createPayout } from "../paypal/payouts";
 import { signPayload } from "../receipts";
+import { promptPrecheck } from "../ai/precheck";
+import { visionCompliance } from "../ai/vision";
+import { geminiConfigured } from "../ai/gemini";
 import { stubCompliance } from "./compliance";
 import { AiProvider } from "../ai/provider";
 import { DrizzleQuota } from "../ai/quota-store";
@@ -61,7 +64,10 @@ export function engineDeps(overrides: Partial<EngineDeps> = {}): EngineDeps {
     store: new DrizzleStore(),
     paypal: livePayPal,
     provider: providerFromEnv(),
-    compliance: stubCompliance,
+    // After render, before capture: Gemini looks at the output (stub renders pass with a note).
+    compliance: geminiConfigured() && process.env.COMPLIANCE !== "stub" ? visionCompliance({ references: (ref) => referencePhotos(ref) }) : stubCompliance,
+    // Before any money moves: the banned-use rules, plus the Gemini classifier when configured.
+    precheck: process.env.PROMPT_PRECHECK === "off" ? undefined : promptPrecheck,
     sign: signPayload,
     now: () => new Date(),
     reviewWindowSeconds: reviewWindowSeconds(),

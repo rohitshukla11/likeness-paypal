@@ -50,6 +50,13 @@
       "when": 1794376125913,
       "tag": "0006_tired_deadpool",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1794382404880,
+      "tag": "0007_certain_james_howlett",
+      "breakpoints": true
     }
   ]
 }

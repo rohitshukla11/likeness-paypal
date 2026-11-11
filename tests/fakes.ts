@@ -79,6 +79,7 @@ export class MemoryStore implements EngineStore {
           mandateId: req.mandateId,
           kind: req.kind,
           fromRenderId: req.fromRenderId ?? null,
+          aspect: req.aspect ?? null,
           use: req.use,
           prompt: req.prompt,
           promptSha256: sha256Hex(req.prompt),

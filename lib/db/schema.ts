@@ -221,6 +221,8 @@ export const renders = pgTable(
     kind: text("kind").notNull(),
     /** Video only: the generated ad image (an earlier image render under the same licence) used as its first frame. */
     fromRenderId: text("from_render_id").references((): AnyPgColumn => renders.id),
+    /** Image aspect ratio asked for (1:1, 9:16, 16:9). */
+    aspect: text("aspect"),
     use: text("use").notNull(),
     prompt: text("prompt").notNull(),
     promptSha256: text("prompt_sha256").notNull(),

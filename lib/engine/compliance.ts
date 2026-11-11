@@ -10,9 +10,11 @@ export interface ComplianceInput {
   use: string;
   prompt: string;
   output: RenderOutput;
+  /** The creator's reference photo ref, for a likeness check. */
+  creatorPhotoRef?: string | null;
 }
 
-export type ComplianceResult = { ok: true } | { ok: false; reason: string };
+export type ComplianceResult = { ok: true; note?: string } | { ok: false; reason: string };
 
 export interface ComplianceHook {
   readonly name: string;

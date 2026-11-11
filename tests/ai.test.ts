@@ -59,11 +59,11 @@ describe("safety filter rules", () => {
 });
 
 describe("AiProvider (images)", () => {
-  it("renders with Gemini from the reference photo, labelled JPEG, filter first", async () => {
+  it("renders with Gemini from the reference photo, a labelled JPEG (the prompt check now runs before payment, in the engine)", async () => {
     const g = await fakeGemini();
     const p = new AiProvider({ quota: new MemoryQuota(), stub: new StubProvider(), references: ref, client: g.client, caps });
     const out = await p.render(input());
-    assert.deepEqual(g.calls, ["gemini-3.5-flash-lite", "gemini-nano-banana-2.1"]);
+    assert.deepEqual(g.calls, ["gemini-nano-banana-2.1"]);
     assert.equal(out.mime, "image/jpeg");
     assert.equal(out.model, "gemini-nano-banana-2.1");
     assert.ok(out.bytes && out.bytes.length > 1000);
@@ -104,13 +104,6 @@ describe("AiProvider (images)", () => {
     assert.match(out.note!, /no reference photo/);
   });
 
-  it("the Gemini classifier refuses: the render throws (the engine then voids)", async () => {
-    const g = await fakeGemini({ banned: ["impersonation"] });
-    const p = new AiProvider({ quota: new MemoryQuota(), stub: new StubProvider(), references: ref, client: g.client, caps });
-    await assert.rejects(p.render(input()), /safety filter/);
-    assert.deepEqual(g.calls, ["gemini-3.5-flash-lite"], "no image call after a refusal");
-  });
-
   it("video without a video renderer or clip: a pre-made animation stands in, labelled", async () => {
     const g = await fakeGemini();
     const p = new AiProvider({ quota: new MemoryQuota(), stub: new StubProvider(), references: ref, client: g.client, caps, demoClip: async () => null });
@@ -131,16 +124,26 @@ describe("engine with the AI provider", () => {
     assert.equal(t.store.media.get("rnd_ai1")!.sha256, r.outputSha256);
   });
 
-  it("a safety refusal after the authorization voids it", async () => {
-    const g = await fakeGemini({ banned: ["political"] });
+  it("a refused prompt is refused BEFORE payment: zero PayPal calls", async () => {
+    const t = testEngine();
+    t.deps.precheck = async () => ({ ok: false, reason: "prompt_refused", detail: "banned use (rules) — Political: “vote for”" });
+    const r = await renderAndPay({ renderId: "rnd_ai2", licenceId: "lic_1", mandateId: "man_1", kind: "image", use: "advertising", prompt: "Rohit says vote for X" }, t.deps);
+    assert.equal(r.status, "refused");
+    assert.equal(t.calls.length, 0);
+    assert.equal(t.store.refusals[0].reason, "prompt_refused");
+  });
+
+  it("the vision check fails after render: the authorization is voided, never captured", async () => {
+    const g = await fakeGemini();
     const t = testEngine({ provider: new AiProvider({ quota: new MemoryQuota(), stub: new StubProvider(), references: ref, client: g.client, caps }) });
-    const r = await renderAndPay({ renderId: "rnd_ai2", licenceId: "lic_1", mandateId: "man_1", kind: "image", use: "advertising", prompt: "Rohit at a rally" }, t.deps);
+    t.deps.compliance = { name: "vision", check: async () => ({ ok: false, reason: "vision check: 2 people visible (exactly one expected)" }) };
+    const r = await renderAndPay({ renderId: "rnd_ai3", licenceId: "lic_1", mandateId: "man_1", kind: "image", use: "advertising", prompt: "Rohit with a coffee" }, t.deps);
     assert.equal(r.status, "voided");
     assert.deepEqual(
       t.calls.map((c) => c.op),
       ["createVaultOrder", "voidAuthorization"],
     );
-    assert.equal(t.store.refusals[0].reason, "render_failed");
+    assert.equal(t.store.refusals[0].reason, "compliance_failed");
   });
 });
 

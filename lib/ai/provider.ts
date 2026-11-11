@@ -2,7 +2,7 @@
  * The AI render provider (RENDER_PROVIDER=gemini), in this order for an image:
  *   1. a reference photo of the creator must exist, else the stub stands in (note says why);
  *   2. the AI caps are reserved atomically (lib/ai/quota.ts), else the stub stands in: no AI call at all;
- *   3. the prompt safety filter (rules + Gemini classifier, fail closed): a refusal throws, so the engine voids;
+ *   (the prompt safety filter now runs in the engine BEFORE payment: lib/ai/precheck.ts)
  *   4. Gemini image generation from the reference photo, the visible "AI-generated" label, and a C2PA content
  *      credential when a signing certificate is configured.
  * The engine stores the bytes and serves them at /media/<render id>. Any thrown error voids the authorization.
@@ -10,7 +10,6 @@
  */
 import { createHash } from "node:crypto";
 import type { RenderInput, RenderOutput, RenderProvider } from "../engine/providers";
-import { checkPrompt } from "./filter";
 import { geminiConfigured, type GenAiLike } from "./gemini";
 import { labelRender } from "./label";
 import { aiCaps, imageKeys, videoKeys, type AiCaps, type Quota } from "./quota";
@@ -63,9 +62,7 @@ export class AiProvider implements RenderProvider {
     if (!(await this.deps.quota.reserve(imageKeys(input.workspaceId, (this.deps.now ?? (() => new Date()))(), caps)))) {
       return this.standIn(input, `Demo render: the AI image cap is reached (${caps.imageDaily} a day, ${caps.imagePerWorkspace} per workspace), so a pre-made image stands in.`);
     }
-    const filter = await checkPrompt(input.prompt, input.use, this.deps.client);
-    if (!filter.allowed) throw new Error(`refused by the safety filter: ${filter.reasons.join("; ")}`);
-    const out = await geminiImage({ prompt: input.prompt, references: refs, aspectRatio: "1:1" }, this.deps.client);
+    const out = await geminiImage({ prompt: input.prompt, references: refs, aspectRatio: input.aspect ?? "1:1" }, this.deps.client);
     const labelled = new Uint8Array(await labelRender(out.bytes));
     const bytes = this.deps.credential ? this.deps.credential(labelled, "image/jpeg", input, out.model) : labelled;
     return { outputRef: "", bytes, sha256: sha(bytes), mime: "image/jpeg", model: out.model, note: null };
@@ -84,8 +81,6 @@ export class AiProvider implements RenderProvider {
     if (!still) return clip("Demo render: a video starts from a generated ad image under this licence, and there is none to start from.");
     const caps = this.caps;
     if (!(await this.deps.quota.reserve(videoKeys(caps)))) return clip(`Demo render: the AI video cap (${caps.videoTotal} in total) is reached.`);
-    const filter = await checkPrompt(input.prompt, input.use, this.deps.client);
-    if (!filter.allowed) throw new Error(`refused by the safety filter: ${filter.reasons.join("; ")}`);
     const out = await this.deps.video(input, still);
     const bytes = this.deps.credential ? this.deps.credential(out.bytes, "video/mp4", input, out.model) : out.bytes;
     return { outputRef: "", bytes, sha256: sha(bytes), mime: out.mime, model: out.model, note: "AI-generated video. The AI label is shown with the video and in its receipt (no ffmpeg here to burn it in)." };
