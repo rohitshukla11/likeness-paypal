@@ -21,4 +21,4 @@ export type Testimonial = { quote: string; name: string; role: string };
 /** Real, attributed quotes only. Leave empty until there are some: the section is then not rendered. */
 export const TESTIMONIALS: Testimonial[] = [];
 
-export const BUILT_ON = ["PayPal Vault", "Orders v2", "Payouts", "JS SDK v6", "Neon Postgres", "Ed25519 receipts", "Next.js"];
+export const BUILT_ON = ["PayPal Vault", "Orders v2", "Payouts", "JS SDK v6", "Neon Postgres", "Ed25519 receipts"];

@@ -6,7 +6,7 @@
  * the four-step accordion; the tilted, overlapping example cards; the testimonial marquee (only with real quotes);
  * the CTA band. Motion is CSS plus an IntersectionObserver hook, and static under reduced motion.
  * Every "Continue as Brand / Creator" is a form posting the continueAs server action (app/actions.ts), so it works
- * before hydration; `account` is a server-rendered slot (Reset demo when the visitor already has a workspace).
+ * before hydration; `account` is an optional server-rendered slot in the hero bar.
  */
 import Image from "next/image";
 import Link from "next/link";
@@ -74,7 +74,7 @@ function Hero({ account }: { account?: ReactNode }) {
 
       <header className="lk-drop relative mx-auto flex max-w-[1320px] flex-wrap items-center gap-x-7 gap-y-1 px-4 py-4 sm:px-8 sm:py-5">
         <Link href="/" className="font-display text-[18px] font-black tracking-[0.02em] text-ink no-underline sm:text-[20px]">
-          LIKENESS <span className="font-sans text-[13px] font-semibold tracking-normal sm:text-[14px]">× PayPal</span>
+          LIKENESS
         </Link>
         <nav aria-label="Main" className="order-3 flex w-full flex-wrap gap-x-4 text-[13px] font-medium sm:gap-x-7 sm:text-[14px] md:order-none md:w-auto md:flex-1">
           <a href="#how" className="py-3 text-ink no-underline hover:underline">
@@ -87,6 +87,7 @@ function Hero({ account }: { account?: ReactNode }) {
         <div className="ml-auto flex flex-wrap items-center justify-end gap-2 sm:gap-3">
           {account}
           <ContinueAs role="brand" kind="ink" className="px-5 text-[14px]" />
+          <ContinueAs role="creator" kind="outline-dark" className="px-5 text-[14px]" />
         </div>
       </header>
 
@@ -105,19 +106,6 @@ function Hero({ account }: { account?: ReactNode }) {
         </div>
         <Ribbon words={RIBBON_A} dir="l" className="top-[236px] z-10 bg-violet text-white sm:top-[476px]" style={{ transform: "rotate(4deg)" }} />
         <Ribbon words={RIBBON_B} dir="r" className="top-[266px] z-10 bg-[#4C5230] text-white sm:top-[514px]" style={{ transform: "rotate(-3deg)" }} />
-      </div>
-
-      <div className="relative mx-auto flex max-w-[760px] flex-col items-center gap-5 px-4 pt-16 text-center sm:px-8">
-        <p className="m-0 text-[clamp(16px,1.6vw,19px)] font-medium leading-relaxed text-[#3E4148]">
-          License your face to AI ads and get paid per ad, through PayPal. The creator approves a licence once; the brand approves a
-          mandate and saves its PayPal wallet once. Every ad is then authorized, rendered, captured, and paid out 90% to the creator, or
-          refunded.
-        </p>
-        <div className="flex flex-wrap justify-center gap-3">
-          <ContinueAs role="brand" kind="ink" className="px-6" />
-          <ContinueAs role="creator" kind="outline-dark" className="px-6" />
-        </div>
-        <p className="m-0 text-[13px] text-[#5F636B]">PayPal sandbox demo. Each visitor gets a private workspace with a creator (Rohit) and a demo brand. No sign-up.</p>
       </div>
 
       <div className="relative mx-auto flex max-w-[1180px] flex-wrap items-center justify-center gap-x-[clamp(24px,4.4vw,64px)] gap-y-3 px-4 pb-8 pt-12 text-[clamp(15px,1.4vw,18px)] font-semibold text-[#5F636B] sm:px-8">
