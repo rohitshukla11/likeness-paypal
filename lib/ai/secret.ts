@@ -1,8 +1,8 @@
 import "server-only";
 /**
  * A server secret (PEM, JSON) from an env value or from a file the env names. Locally each secret
- * stays in its file under ../.secrets/ (mode 0600); a hosted deployment such as Vercel has no such
- * files and passes the value instead. A value may carry its newlines escaped as \n. Never logged.
+ * stays in its file under private/ (git-ignored, mode 0600); a hosted deployment has no such files
+ * and passes the value instead. A value may carry its newlines escaped as \n. Never logged.
  */
 import { existsSync, readFileSync } from "node:fs";
 

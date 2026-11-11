@@ -1,72 +1,64 @@
 import "server-only";
 /**
- * C2PA manifests for every render (@contentauth/c2pa-node 0.9.9, c2pa-rs underneath).
+ * C2PA content credentials for AI renders (@contentauth/c2pa-node 0.9.9, c2pa-rs underneath).
  *
- * Each output carries a signed manifest with:
- *  - c2pa.actions: "c2pa.created" by the model, with the
- *    IPTC digital source type for AI output;
+ * Each AI image or video carries a signed manifest with:
+ *  - c2pa.actions: "c2pa.created" by the model, with the IPTC digital source type for AI output;
  *  - c2pa.training-mining: AI training and mining not allowed;
- *  - xyz.likeness.licence: the licence id, creator, licensee, use, render index and how to find the
- *    receipt. The KMS-signed receipt is keyed by sha256 of this exact file (manifest included), so the
- *    manifest says where to look it up rather than carrying a signature that cannot exist before the
- *    file does.
+ *  - xyz.likeness.licence: the licence, render, licensed use, the PayPal order and authorization behind it, and
+ *    how to find the receipt. The Ed25519 receipt names the sha256 of this exact file (manifest included), so the
+ *    manifest says where to look it up rather than carrying a signature that can't exist before the file does.
  *
- * Signed with a TEST certificate chain (scripts/c2pa-testcert.sh). It is not on the C2PA trust list,
- * so validators report "signing certificate untrusted"; the verifier page says so plainly.
+ * Signed with a TEST certificate chain made locally (scripts/c2pa-testcert.sh, into private/c2pa/, or the PEMs in
+ * C2PA_CERT_PEM / C2PA_KEY_PEM). It is not on the C2PA trust list, so validators report "signing certificate
+ * untrusted". No cloud service is involved. Without a certificate, renders simply carry no manifest.
  */
+import { existsSync } from "node:fs";
+import path from "node:path";
 import { Builder, LocalSigner, Reader } from "@contentauth/c2pa-node";
 import { secretText } from "./secret";
 
 export const LICENCE_ASSERTION = "xyz.likeness.licence";
 
 export type LicenceAssertion = {
-  protocol: "likeness-ai/1";
+  protocol: "likeness-paypal/1";
   licenceId: string;
-  renderIndex: number;
+  renderId: string;
   renderType: "image" | "video";
-  creator: { id: string; name: string; youtubeChannelId: string | null };
-  licensee: { id: string; name: string };
   use: string;
-  receipt: { store: "Firestore receipts/{sha256}"; key: "sha256 of this file, manifest included"; signedBy: "Cloud KMS EC_SIGN_P256_SHA256"; verify: string };
+  payment: { provider: "PayPal"; orderId: string | null; authorizationId: string | null };
+  receipt: { store: "Postgres receipts, by render id"; signedBy: "Ed25519 (GET /api/receipts/public-key)"; verify: string };
   renderer: { provider: string; model: string };
   promptSha256: string;
   createdAt: string;
 };
 
-function signer() {
-  const cert = secretText("C2PA_CERT_PEM", "C2PA_CERT_FILE", "../.secrets/c2pa/signer.pem");
-  const key = secretText("C2PA_KEY_PEM", "C2PA_KEY_FILE", "../.secrets/c2pa/signer.key");
-  try {
-    if (!cert || !key) throw new Error("missing");
-    return LocalSigner.newSigner(Buffer.from(cert), Buffer.from(key), "es256");
-  } catch {
-    throw Object.assign(new Error("C2PA signing certificate missing: run `sh scripts/c2pa-testcert.sh` (test certificate)"), { status: 503 });
-  }
+const dir = () => path.resolve(/*turbopackIgnore: true*/ process.cwd(), process.env.PRIVATE_DIR || "private", "c2pa");
+
+function credentials() {
+  const cert = secretText("C2PA_CERT_PEM", "C2PA_CERT_FILE", path.join(dir(), "signer.pem"));
+  const key = secretText("C2PA_KEY_PEM", "C2PA_KEY_FILE", path.join(dir(), "signer.key"));
+  return cert && key ? { cert, key } : null;
 }
 
-const SOURCE_TYPE = {
-  model: "http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia",
-  test: "http://cv.iptc.org/newscodes/digitalsourcetype/compositeSynthetic",
-};
+/** Whether a signing certificate is available (env PEMs, or private/c2pa/ from scripts/c2pa-testcert.sh). */
+export const c2paConfigured = () => !!process.env.C2PA_CERT_PEM || existsSync(path.join(dir(), "signer.pem"));
+
+function signer() {
+  const c = credentials();
+  if (!c) throw Object.assign(new Error("C2PA signing certificate missing: run `sh scripts/c2pa-testcert.sh` (test certificate)"), { status: 503 });
+  return LocalSigner.newSigner(Buffer.from(c.cert), Buffer.from(c.key), "es256");
+}
+
+const SOURCE_TYPE = "http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia";
 
 export function embedManifest(bytes: Uint8Array, mime: "image/jpeg" | "image/png" | "video/mp4", a: LicenceAssertion): Uint8Array {
   const builder = Builder.withJson({
-    claim_generator_info: [{ name: "Likeness render service", version: "0.1.0" }],
-    title: `likeness-licence-${a.licenceId}-render-${a.renderIndex}.${mime === "image/png" ? "png" : mime === "video/mp4" ? "mp4" : "jpg"}`,
+    claim_generator_info: [{ name: "Likeness × PayPal render service", version: "0.1.0" }],
+    title: `likeness-licence-${a.licenceId}-render-${a.renderId}.${mime === "image/png" ? "png" : mime === "video/mp4" ? "mp4" : "jpg"}`,
     format: mime,
     assertions: [
-      {
-        label: "c2pa.actions",
-        data: {
-          actions: [
-            {
-              action: "c2pa.created",
-              digitalSourceType: SOURCE_TYPE.model,
-              softwareAgent: { name: a.renderer.model },
-            },
-          ],
-        },
-      },
+      { label: "c2pa.actions", data: { actions: [{ action: "c2pa.created", digitalSourceType: SOURCE_TYPE, softwareAgent: { name: a.renderer.model } }] } },
       {
         label: "c2pa.training-mining",
         data: {
@@ -87,77 +79,11 @@ export function embedManifest(bytes: Uint8Array, mime: "image/jpeg" | "image/png
   return new Uint8Array(out.buffer);
 }
 
-/** A preview Likeness publishes: a creator's profile photo or a sample render. Never a licence. */
-export const PREVIEW_ASSERTION = "xyz.likeness.preview";
-export type PreviewAssertion = {
-  kind: "profile-photo" | "sample-render";
-  /** A profile image made by Likeness's renderer (from one of the creator's approved samples), not a photo. */
-  aiGenerated?: boolean;
-  statement: string;
-  creator: string;
-  creatorRegistry: string;
-  createdAt: string;
-};
-
-const PREVIEW_STATEMENT: Record<PreviewAssertion["kind"], string> = {
-  "profile-photo": "Profile photo of a Likeness creator. Not a licensed asset: no licence to use this face comes with it.",
-  "sample-render": "Sample render, not a licence. Made by Likeness for the creator's profile; no licence to use this face comes with it.",
-};
-
-export function embedPreviewManifest(bytes: Uint8Array, mime: "image/jpeg" | "image/png", p: Omit<PreviewAssertion, "statement">, model?: string): Uint8Array {
-  const ai = p.kind === "sample-render" || !!p.aiGenerated;
-  const a: PreviewAssertion = {
-    ...p,
-    statement:
-      p.kind === "profile-photo" && p.aiGenerated
-        ? "AI-generated profile image of a Likeness creator, made by Likeness from the creator's own photos. Not a licensed asset: no licence to use this face comes with it."
-        : PREVIEW_STATEMENT[p.kind],
-  };
-  const builder = Builder.withJson({
-    claim_generator_info: [{ name: "Likeness preview service", version: "0.1.0" }],
-    title: `likeness-${p.kind}.${mime === "image/png" ? "png" : "jpg"}`,
-    format: mime,
-    assertions: [
-      {
-        label: "c2pa.actions",
-        data: {
-          actions: [
-            ai
-              ? { action: "c2pa.created", digitalSourceType: SOURCE_TYPE.model, softwareAgent: { name: model ?? "Likeness sample renderer" } }
-              : {
-                  action: "c2pa.created",
-                  digitalSourceType: "http://cv.iptc.org/newscodes/digitalsourcetype/digitalCapture",
-                  description: "The creator's own photo, resized, metadata removed and watermarked for their public profile",
-                },
-          ],
-        },
-      },
-      {
-        label: "c2pa.training-mining",
-        data: {
-          entries: {
-            "c2pa.ai_generative_training": { use: "notAllowed" },
-            "c2pa.ai_inference": { use: "notAllowed" },
-            "c2pa.ai_training": { use: "notAllowed" },
-            "c2pa.data_mining": { use: "notAllowed" },
-          },
-        },
-      },
-      { label: PREVIEW_ASSERTION, data: a },
-    ],
-  } as never);
-  const out: { buffer: Buffer | null } = { buffer: null };
-  builder.sign(signer(), { buffer: Buffer.from(bytes), mimeType: mime }, out as never);
-  if (!out.buffer) throw new Error("C2PA signing produced no output");
-  return new Uint8Array(out.buffer);
-}
-
 export type ManifestRead =
   | { present: false; error?: string }
   | {
       present: true;
       licence: LicenceAssertion | null;
-      preview: PreviewAssertion | null;
       signer: { issuer?: string; commonName?: string; alg?: string };
       /** c2pa-rs validation codes; "signingCredential.untrusted" is expected for the test certificate. */
       validation: { code: string; explanation?: string }[];
@@ -184,11 +110,9 @@ export async function readManifest(bytes: Uint8Array, mime: string): Promise<Man
   const validation = store.validation_status ?? [];
   const failures = validation.filter((v) => v.code !== "signingCredential.untrusted");
   const licence = (m.assertions?.find((x) => x.label === LICENCE_ASSERTION)?.data as LicenceAssertion | undefined) ?? null;
-  const preview = (m.assertions?.find((x) => x.label === PREVIEW_ASSERTION)?.data as PreviewAssertion | undefined) ?? null;
   return {
     present: true,
     licence,
-    preview,
     signer: { issuer: m.signature_info?.issuer, commonName: m.signature_info?.common_name, alg: m.signature_info?.alg },
     validation,
     signatureValid: failures.length === 0,

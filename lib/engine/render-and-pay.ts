@@ -238,7 +238,7 @@ async function authorize(r: RenderRow, deps: EngineDeps): Promise<RenderRow> {
 async function produce(r: RenderRow, deps: EngineDeps): Promise<RenderRow> {
   const ctx = await deps.store.context(r.id);
   try {
-    const out = await deps.provider.render({ renderId: r.id, kind: r.kind, prompt: r.prompt, use: r.use, workspaceId: ctx.creator.workspaceId, creatorPhotoRef: ctx.creator.photoRef });
+    const out = await deps.provider.render({ renderId: r.id, kind: r.kind, prompt: r.prompt, use: r.use, workspaceId: ctx.creator.workspaceId, creatorPhotoRef: ctx.creator.photoRef, licenceId: r.licenceId, orderId: r.orderId, authorizationId: r.authorizationId });
     const check = await deps.compliance.check({ renderId: r.id, use: r.use, prompt: r.prompt, output: out });
     if (!check.ok) return fail(r, deps, "voided", "compliance_failed", check.reason, true);
     let outputRef = out.outputRef;

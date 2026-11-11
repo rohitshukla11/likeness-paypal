@@ -7,6 +7,8 @@ import { signPayload } from "../receipts";
 import { stubCompliance } from "./compliance";
 import { AiProvider } from "../ai/provider";
 import { DrizzleQuota } from "../ai/quota-store";
+import { createHash } from "node:crypto";
+import { c2paConfigured, embedManifest } from "../ai/c2pa";
 import { veoPrompt } from "../ai/creative";
 import { demoClip, referencePhotos } from "../ai/reference";
 import { imageToVideo } from "../ai/render-video";
@@ -27,6 +29,21 @@ export function providerFromEnv(env: NodeJS.ProcessEnv = process.env): RenderPro
     references: (i) => referencePhotos(i.creatorPhotoRef),
     demoClip,
     video: (i, still) => imageToVideo({ image: still.bytes, mime: still.mime, prompt: veoPrompt(i.prompt, "9:16"), aspectRatio: "9:16" }),
+    credential: c2paConfigured()
+      ? (bytes, mime, i, model) =>
+          embedManifest(bytes, mime, {
+            protocol: "likeness-paypal/1",
+            licenceId: i.licenceId ?? "",
+            renderId: i.renderId,
+            renderType: i.kind,
+            use: i.use,
+            payment: { provider: "PayPal", orderId: i.orderId ?? null, authorizationId: i.authorizationId ?? null },
+            receipt: { store: "Postgres receipts, by render id", signedBy: "Ed25519 (GET /api/receipts/public-key)", verify: `${env.APP_URL ?? ""}/verify` },
+            renderer: { provider: "Gemini API", model },
+            promptSha256: createHash("sha256").update(i.prompt).digest("hex"),
+            createdAt: new Date().toISOString(),
+          })
+      : undefined,
   });
 }
 

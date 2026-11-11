@@ -17,6 +17,10 @@ export interface RenderInput {
   use: string;
   /** The demo workspace, for the per-workspace AI cap. */
   workspaceId: string | null;
+  /** The licence and the PayPal authorization the render is made under (named in its content credential). */
+  licenceId?: string;
+  orderId?: string | null;
+  authorizationId?: string | null;
   /** The creator's reference photo (path under public/ or a storage key). */
   creatorPhotoRef: string | null;
 }

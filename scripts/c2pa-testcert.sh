@@ -1,11 +1,11 @@
 #!/bin/sh
 # Generates a TEST C2PA signing chain: a local root CA and an ES256 leaf for "Likeness render service
 # (TEST)". It is not on any C2PA trust list, so validators report the signer as untrusted; that is
-# expected and the verifier page says so. Output goes to ../.secrets/c2pa (git-ignored), never committed.
+# expected. Output goes to private/c2pa (git-ignored), never committed; or set C2PA_CERT_PEM / C2PA_KEY_PEM.
 #
 #   sh scripts/c2pa-testcert.sh          # once; re-running keeps an existing chain
 set -eu
-dir="${C2PA_DIR:-../.secrets/c2pa}"
+dir="${C2PA_DIR:-private/c2pa}"
 if [ -f "$dir/signer.pem" ] && [ -f "$dir/signer.key" ]; then
   echo "C2PA test chain already present in $dir"
   exit 0

@@ -25,7 +25,7 @@ export async function referencePhotos(photoRef: string | null): Promise<Referenc
   const p = referencePath(photoRef);
   if (!p) return [];
   try {
-    const bytes = new Uint8Array(await readFile(p));
+    const bytes = new Uint8Array(await readFile(/*turbopackIgnore: true*/ p));
     const mime = p.toLowerCase().endsWith(".png") ? "image/png" : "image/jpeg";
     return [{ bytes, mime }];
   } catch {
@@ -36,7 +36,7 @@ export async function referencePhotos(photoRef: string | null): Promise<Referenc
 /** The saved real clip played back over the video cap, labelled "demo render". */
 export async function demoClip(): Promise<Uint8Array | null> {
   try {
-    return new Uint8Array(await readFile(path.join(PRIVATE(), "demo-video.mp4")));
+    return new Uint8Array(await readFile(/*turbopackIgnore: true*/ path.join(PRIVATE(), "demo-video.mp4")));
   } catch {
     return null;
   }

@@ -6,3 +6,5 @@ allowBuilds:
   # No-op preinstall; protobufjs's postinstall only sets up its CLI. Neither is needed.
   "@google/genai": false
   protobufjs: false
+  # Downloads its prebuilt native library (c2pa-rs) from the package's own GitHub release; no Rust build.
+  "@contentauth/c2pa-node": true
