@@ -12,6 +12,10 @@
  *   pnpm ai:once --kind image            # dry run
  *   pnpm ai:once --kind image --confirm  # one real Gemini image
  *   pnpm ai:once --kind video [--from rnd_…] --confirm  # one real Omni Flash video from that ad image
+ * With --provider eth: the likeness-eth pipeline (lib/ai/eth.ts) instead: its prompt templates and face check, and a
+ * video that makes its own 16:9 opening still from the reference photo, then VIDEO_SECONDS (8) of Omni Flash at 16:9
+ * (no --from needed: each run starts in a fresh demo workspace with an approved licence for Rohit).
+ *   pnpm ai:once --provider eth --kind image|video [--confirm]
  */
 import { mkdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -20,6 +24,8 @@ import { c2paConfigured, embedManifest, readManifest } from "../lib/ai/c2pa";
 import { veoPrompt } from "../lib/ai/creative";
 import { geminiConfigured, geminiModels, genai, type GenAiLike } from "../lib/ai/gemini";
 import { AiProvider } from "../lib/ai/provider";
+import { EthProvider, ethVideoSeconds } from "../lib/ai/eth";
+import { fullPrompt, promptsFor } from "../lib/ai/eth-prompts";
 import { aiCaps, MemoryQuota } from "../lib/ai/quota";
 import { adImage, referencePath, referencePhotos } from "../lib/ai/reference";
 import { estimatedVideoCostUsd, imageToVideo, videoSeconds } from "../lib/ai/render-video";
@@ -39,6 +45,7 @@ const arg = (k: string) => process.argv.includes(k);
 const kind = process.argv[process.argv.indexOf("--kind") + 1] === "video" ? "video" : "image";
 const confirm = arg("--confirm");
 const fromArg = process.argv.includes("--from") ? process.argv[process.argv.indexOf("--from") + 1] : null;
+const eth = process.argv.includes("--provider") && process.argv[process.argv.indexOf("--provider") + 1] === "eth";
 const short = (s?: string | null) => (!s ? "-" : s.length <= 12 ? s : `${s.slice(0, 6)}…${s.slice(-4)}`);
 const line = (k: string, v: string) => console.log(`${k.padEnd(22)} ${v}`);
 const PROMPT = {
@@ -89,7 +96,7 @@ async function main() {
   const clip = await stat(path.join(path.dirname(ref), "demo-video.mp4")).then((s) => s.size, () => 0);
   // Video: the AI image render whose generated ad is the first frame (--from, or the newest), and its licence.
   const [source] =
-    kind === "video"
+    kind === "video" && !eth
       ? await db()
           .select({ id: renders.id, licenceId: renders.licenceId, mandateId: renders.mandateId, status: renders.status, prompt: renders.prompt })
           .from(renders)
@@ -98,21 +105,34 @@ async function main() {
           .limit(1)
       : [];
   const sourceImage = source ? await adImage(source.id, source.licenceId) : null;
-  const estimate =
-    kind === "image" ? 0.0336 + (1300 + 400) * 1.5e-6 + 0.0005 : estimatedVideoCostUsd() + 2000 * 1.5e-6 + 0.0005;
+  // eth: an image (or a video's opening still) plus a face check; a video adds VIDEO_SECONDS of Omni Flash.
+  const ethStill = 0.0336 + (1300 + 900) * 1.5e-6 + 0.0005;
+  const estimate = eth
+    ? kind === "image"
+      ? ethStill + 0.0005
+      : ethStill + estimatedVideoCostUsd(ethVideoSeconds()) + 2000 * 1.5e-6 + 0.0005
+    : kind === "image"
+      ? 0.0336 + (1300 + 400) * 1.5e-6 + 0.0005
+      : estimatedVideoCostUsd() + 2000 * 1.5e-6 + 0.0005;
 
-  console.log(`${confirm ? "RUN" : "DRY RUN"}: one ${kind} render through the engine (PayPal sandbox)`);
-  line("model", kind === "image" ? `${geminiModels.image()} (1K, 1:1), filter ${geminiModels.filter()}` : `${geminiModels.video()} (Gemini Omni Flash), filter ${geminiModels.filter()}`);
-  if (kind === "video") {
+  console.log(`${confirm ? "RUN" : "DRY RUN"}: one ${kind} render through the engine (PayPal sandbox)${eth ? ", RENDER_PROVIDER=eth (likeness-eth pipeline)" : ""}`);
+  if (eth) {
+    line("model", kind === "image" ? `${geminiModels.image()} (1K, 1:1); face check ${geminiModels.filter()}` : `${geminiModels.image()} opening still (1K, 16:9), face check ${geminiModels.filter()}, then ${geminiModels.video()} (Gemini Omni Flash)`);
+    if (kind === "video") line("video", `${ethVideoSeconds()} s, 720p, 16:9, from its own opening still; Omni task image_to_video; timeout ${Number(process.env.VIDEO_TIMEOUT_MS ?? 300000) / 1000} s`);
+    line("on a face mismatch", "regenerates the still once (one more image call, about $0.035); a second mismatch voids the authorization");
+    line("prompt preflight", `${geminiModels.filter()} prompt filter before payment, vision compliance after render`);
+  } else line("model", kind === "image" ? `${geminiModels.image()} (1K, 1:1), filter ${geminiModels.filter()}` : `${geminiModels.video()} (Gemini Omni Flash), filter ${geminiModels.filter()}`);
+  if (kind === "video" && !eth) {
     line("video", `${videoSeconds()} s, 720p, 9:16; Omni task image_to_video; timeout ${Number(process.env.VIDEO_TIMEOUT_MS ?? 300000) / 1000} s`);
     line("first frame", sourceImage && source ? `the generated ad of render ${short(source.id)} (${Math.round(sourceImage.bytes.length / 1024)} KB, ${sourceImage.mime}, ${source.status}): "${source.prompt.slice(0, 60)}…"` : "MISSING: no AI image render to start from (run --kind image first)");
     line("licence", source ? `the same licence as that image (${short(source.licenceId)}), its mandate ${short(source.mandateId)}` : "-");
   }
-  if (kind === "image") line("reference photo", refSize ? `${path.relative(process.cwd(), ref)} (${Math.round(refSize / 1024)} KB)` : `MISSING: put it at ${path.relative(process.cwd(), ref)}`);
+  if (kind === "image" || eth) line("reference photo", refSize ? `${path.relative(process.cwd(), ref)} (${Math.round(refSize / 1024)} KB)` : `MISSING: put it at ${path.relative(process.cwd(), ref)}`);
   line("GEMINI_API_KEY", geminiConfigured() ? "set" : "MISSING: add it to .env.local");
   line("C2PA certificate", c2paConfigured() ? "present (test chain, private/c2pa)" : "none (no content credential)");
   if (kind === "video") line("demo clip (fallback)", clip ? `private/demo-video.mp4 (${Math.round(clip / 1024)} KB)` : "not there yet");
   line("prompt", `"${PROMPT[kind]}"`);
+  if (eth) console.log(`\nExact prompt sent (likeness-eth templates):\n${fullPrompt(kind, promptsFor(kind, PROMPT[kind]))}\n`);
   line("PayPal (sandbox)", `authorize ${kind === "video" ? "$6.00 (3 × $2.00)" : "$2.00"} on the demo wallet, capture, brand accepts, payout 90%`);
   line("estimated cost", `about $${estimate.toFixed(3)} (Gemini API list prices, 2026-11)`);
   line("caps", `this run uses its own counter; the app's caps stay ${JSON.stringify(aiCaps())}`);
@@ -120,11 +140,35 @@ async function main() {
     console.log("\nNo Gemini call made. Re-run with --confirm to make exactly one render.");
     return;
   }
-  if (!geminiConfigured() || (kind === "image" && !refSize) || (kind === "video" && !sourceImage)) throw new Error("missing an input (see above)");
+  if (!geminiConfigured() || ((kind === "image" || eth) && !refSize) || (kind === "video" && !eth && !sourceImage)) throw new Error("missing an input (see above)");
 
   const usage: Usage[] = [];
   const client = recording(genai(), usage);
-  const provider = new AiProvider({
+  const credential = c2paConfigured()
+    ? (bytes: Uint8Array, mime: "image/jpeg" | "video/mp4", i: { licenceId?: string; renderId: string; kind: "image" | "video"; use: string; orderId?: string | null; authorizationId?: string | null }, model: string) =>
+        embedManifest(bytes, mime, {
+          protocol: "likeness-paypal/1",
+          licenceId: i.licenceId ?? "",
+          renderId: i.renderId,
+          renderType: i.kind,
+          use: i.use,
+          payment: { provider: "PayPal", orderId: i.orderId ?? null, authorizationId: i.authorizationId ?? null },
+          receipt: { store: "Postgres receipts, by render id", signedBy: "Ed25519 (GET /api/receipts/public-key)", verify: "/verify" },
+          renderer: { provider: "Gemini API", model },
+          promptSha256: "",
+          createdAt: new Date().toISOString(),
+        })
+    : undefined;
+  const provider = eth
+    ? new EthProvider({
+        quota: new MemoryQuota(),
+        stub: new StubProvider(),
+        references: (i) => referencePhotos(i.creatorPhotoRef),
+        client,
+        video: (v) => imageToVideo({ image: v.image, mime: v.mime, prompt: v.prompt, seconds: v.seconds, aspectRatio: v.aspectRatio }, client),
+        credential,
+      })
+    : new AiProvider({
     quota: new MemoryQuota(),
     stub: new StubProvider(),
     references: (i) => referencePhotos(i.creatorPhotoRef),
@@ -150,7 +194,7 @@ async function main() {
 
   let licenceId: string;
   let mandateId: string;
-  if (kind === "video") {
+  if (kind === "video" && !eth) {
     licenceId = source!.licenceId;
     mandateId = source!.mandateId;
   } else {
@@ -166,7 +210,7 @@ async function main() {
 
   const t = Date.now();
   const deps = engineDeps({ provider });
-  const r = await renderAndPay({ renderId: newId("rnd"), licenceId, mandateId, kind, fromRenderId: kind === "video" ? source!.id : null, use: "advertising", prompt: PROMPT[kind] }, deps);
+  const r = await renderAndPay({ renderId: newId("rnd"), licenceId, mandateId, kind, fromRenderId: kind === "video" && !eth ? source!.id : null, use: "advertising", prompt: PROMPT[kind] }, deps);
   line("render", `${short(r.id)} ${r.status} in ${Math.round((Date.now() - t) / 1000)} s; model ${r.model ?? "-"}${r.renderNote ? ` (${r.renderNote})` : ""}${r.error ? `; ${r.error}` : ""}`);
   line("PayPal", `order ${short(r.orderId)}, authorization ${short(r.authorizationId)}, capture ${short(r.captureId)}`);
   if (r.status === "in_review") {

@@ -8,32 +8,50 @@ import { promptPrecheck } from "../ai/precheck";
 import { visionCompliance } from "../ai/vision";
 import { geminiConfigured } from "../ai/gemini";
 import { stubCompliance } from "./compliance";
-import { AiProvider } from "../ai/provider";
+import { AiProvider, type AiProviderDeps } from "../ai/provider";
+import { EthProvider } from "../ai/eth";
 import { DrizzleQuota } from "../ai/quota-store";
 import { createHash } from "node:crypto";
 import { c2paConfigured, embedManifest } from "../ai/c2pa";
 import { veoPrompt } from "../ai/creative";
 import { adImage, demoClip, referencePhotos } from "../ai/reference";
 import { imageToVideo } from "../ai/render-video";
-import { StubProvider, type RenderProvider } from "./providers";
+import { StubProvider, type RenderInput, type RenderProvider } from "./providers";
 import type { EngineDeps, PayPalPort } from "./render-and-pay";
 import { DrizzleStore } from "./store";
 
 /**
- * RENDER_PROVIDER=gemini: Gemini images and Gemini Omni Flash videos on the Gemini API, within the AI caps (over
- * the video cap the saved demo clip plays); anything else, or unset: the StubProvider (pre-made, no cost).
+ * RENDER_PROVIDER:
+ *   gemini  Gemini images and Gemini Omni Flash videos on the Gemini API (a video animates an earlier ad image);
+ *   eth     likeness-eth's pipeline on the same Gemini API models (lib/ai/eth.ts): its prompt templates, a face check
+ *           with one regeneration, and a video that makes its own 16:9 opening still, 8 s (VIDEO_SECONDS);
+ *   anything else, or unset: the StubProvider (pre-made, no cost).
+ * Both AI providers stay within the AI caps (over the video cap the saved demo clip plays) and use the same
+ * reference photos, demo clip and content credentials.
  */
 export function providerFromEnv(env: NodeJS.ProcessEnv = process.env): RenderProvider {
   const stub = new StubProvider();
-  if (env.RENDER_PROVIDER !== "gemini") return stub;
-  return new AiProvider({
+  if (env.RENDER_PROVIDER !== "gemini" && env.RENDER_PROVIDER !== "eth") return stub;
+  const shared = {
     quota: new DrizzleQuota(),
     stub,
-    references: (i) => referencePhotos(i.creatorPhotoRef, { renderId: i.renderId, licenceId: i.licenceId }),
+    references: (i: RenderInput) => referencePhotos(i.creatorPhotoRef, { renderId: i.renderId, licenceId: i.licenceId }),
     demoClip,
+    credential: credentialFromEnv(env),
+  };
+  if (env.RENDER_PROVIDER === "eth") {
+    return new EthProvider({ ...shared, video: (v) => imageToVideo({ image: v.image, mime: v.mime, prompt: v.prompt, seconds: v.seconds, aspectRatio: v.aspectRatio }) });
+  }
+  return new AiProvider({
+    ...shared,
     firstFrame: (i) => adImage(i.fromRenderId, i.licenceId),
     video: (i, still) => imageToVideo({ image: still.bytes, mime: still.mime, prompt: veoPrompt(i.prompt, "9:16"), aspectRatio: "9:16" }),
-    credential: c2paConfigured()
+  });
+}
+
+/** The C2PA content credential for AI output, when a signing certificate is configured. */
+function credentialFromEnv(env: NodeJS.ProcessEnv): AiProviderDeps["credential"] {
+  return c2paConfigured()
       ? (bytes, mime, i, model) =>
           embedManifest(bytes, mime, {
             protocol: "likeness-paypal/1",
@@ -47,8 +65,7 @@ export function providerFromEnv(env: NodeJS.ProcessEnv = process.env): RenderPro
             promptSha256: createHash("sha256").update(i.prompt).digest("hex"),
             createdAt: new Date().toISOString(),
           })
-      : undefined,
-  });
+    : undefined;
 }
 
 export const livePayPal: PayPalPort = { createVaultOrder, authorizeOrder, captureAuthorization, voidAuthorization, refundCapture, createPayout };
