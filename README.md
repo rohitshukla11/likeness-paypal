@@ -24,33 +24,25 @@ PayPal.").
 
 **The 3-minute path**
 
-1. Open the live URL and choose **Continue as Brand**.
-2. On the Brand page, save a PayPal wallet in one of two ways. Either is a sandbox PayPal Vault payment token, saved
-   once with no purchase, and it activates your mandate (spending limits).
-   - **Use demo wallet** (one click): attaches a shared sandbox buyer wallet.
-   - **Save PayPal wallet** (PayPal JS SDK v6): log in with the **Judge buyer** sandbox account below.
-3. Open **Studio** and ask the **Brand agent**: *"Make a 9:16 café ad with Rohit"*. Each step shows live:
+1. **Continue as Brand** → click **Use demo wallet** (no PayPal login needed; it attaches a saved PayPal sandbox
+   wallet, a PayPal Vault payment token, and activates your mandate). Optional: **Save PayPal wallet** (PayPal JS
+   SDK v6) works with any PayPal sandbox personal account.
+2. Open **Studio** and ask the **Brand agent**: *"Make a 9:16 café ad with Rohit"*. Each step shows live:
    1. prompt check
    2. licence and mandate check
    3. authorize on your saved wallet
    4. render
    5. compliance check
    6. capture
-4. On the new render card, press **Accept**. The creator is paid 90% through PayPal Payouts, and the receipt is
+3. On the new render card, press **Accept**. The creator is paid 90% through PayPal Payouts, and the receipt is
    signed.
-5. Switch to **Creator**. The payout and its PayPal ids are in Earnings. **Revoke** the licence there.
-6. Back in **Studio**, ask the agent *"Make another one"*. The answer is *"Licence revoked: I didn't charge your
+4. Switch to **Creator**. The payout and its PayPal ids are in Earnings. **Revoke** the licence there.
+5. Back in **Studio**, ask the agent *"Make another one"*. The answer is *"Licence revoked: I didn't charge your
    PayPal."*, with zero PayPal calls.
-7. Optional:
+6. Optional:
    - Ask *"What did I spend this week?"*: the agent answers from the app's records and PayPal's
      `list_transactions`.
    - Check any receipt at **Verify**.
-
-**Sandbox logins**
-
-| Account | Email | Password |
-|---|---|---|
-| Judge buyer (sandbox personal: use it to save a wallet) | *(added by the author)* | *(added by the author)* |
 
 **What's new and what's reused:** everything was built for this hackathon except the files listed in
 [docs/HACKATHON.md](docs/HACKATHON.md). Those were copied from the author's earlier projects in a verbatim commit,
