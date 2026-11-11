@@ -1,0 +1,77 @@
+# Render Blueprint: one Node web service (Starter, Virginia). Secrets are `sync: false`: Render asks for their
+# values when the Blueprint is created; nothing secret is in this file. See docs/DEPLOY.md for every variable.
+services:
+  - type: web
+    name: likeness-paypal
+    runtime: node
+    plan: starter
+    region: virginia
+    branch: main
+    # Deploys stay deliberate: trigger them from the dashboard (no deploy on every push).
+    autoDeploy: false
+    # pnpm 12.10.1 comes from package.json "packageManager" through corepack (bundled with Node 22).
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm build
+    startCommand: pnpm start
+    healthCheckPath: /api/health
+    envVars:
+      # Runtime
+      - key: NODE_VERSION
+        value: "22"
+      - key: COREPACK_ENABLE_DOWNLOAD_PROMPT
+        value: "0"
+      - key: NEXT_TELEMETRY_DISABLED
+        value: "1"
+      # PayPal (sandbox)
+      - key: PAYPAL_ENV
+        value: sandbox
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false
+      - key: PAYPAL_SANDBOX_CREATOR_EMAIL
+        sync: false
+      - key: DEMO_VAULT_ID
+        sync: false
+      - key: PAYPAL_WEBHOOK_ID
+        sync: false
+      # App
+      - key: APP_BASE_URL
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: RECEIPT_SIGNING_KEY
+        sync: false
+      - key: PHOTO_KEK
+        sync: false
+      - key: E2E_TOKEN
+        sync: false
+      - key: CRON_SECRET
+        sync: false
+      # Render engine
+      - key: REVIEW_WINDOW_SECONDS
+        value: "120"
+      - key: SETTLE_LOOP_SECONDS
+        value: "30"
+      # AI (Gemini API) and its caps
+      - key: RENDER_PROVIDER
+        value: gemini
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: RENDER_CAP_DAILY
+        value: "30"
+      - key: RENDER_CAP_PER_WORKSPACE
+        value: "3"
+      - key: VIDEO_CAP_TOTAL
+        value: "3"
+      - key: VIDEO_SECONDS
+        value: "4"
+      - key: VIDEO_TIMEOUT_MS
+        value: "300000"
+      # Content credentials (test certificate)
+      - key: C2PA_CERT_PEM
+        sync: false
+      - key: C2PA_KEY_PEM
+        sync: false
+      # Creator onboarding stays off
+      - key: FEATURE_CREATOR_ONBOARDING
+        value: "false"

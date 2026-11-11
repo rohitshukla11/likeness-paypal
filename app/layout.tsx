@@ -11,7 +11,7 @@ const DESCRIPTION =
   "The creator approves a licence once, the brand approves a mandate and saves its PayPal wallet once; every ad is then authorized, rendered, captured, and paid out 90% to the creator or refunded. PayPal sandbox demo.";
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.APP_URL || "http://localhost:3000"),
+  metadataBase: new URL(process.env.APP_BASE_URL || process.env.APP_URL || "http://localhost:3000"),
   title: { default: `Likeness × PayPal: ${TAGLINE}`, template: "%s · Likeness × PayPal" },
   description: DESCRIPTION,
   openGraph: { type: "website", siteName: "Likeness × PayPal", title: `Likeness × PayPal: ${TAGLINE}`, description: DESCRIPTION },

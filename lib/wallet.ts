@@ -53,9 +53,10 @@ export async function completeWalletSetup(brandId: string, setupTokenId?: string
   return row;
 }
 
-/** The origin PayPal sends the buyer back to: APP_URL, else the request's own origin. */
+/** The origin PayPal sends the buyer back to: APP_BASE_URL (or APP_URL), else the request's own origin. */
 export function appOrigin(h: Headers): string {
-  if (process.env.APP_URL) return process.env.APP_URL.replace(/\/$/, "");
+  const base = process.env.APP_BASE_URL || process.env.APP_URL;
+  if (base) return base.replace(/\/$/, "");
   const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
   const proto = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") || host.startsWith("127.") ? "http" : "https");
   return `${proto}://${host}`;

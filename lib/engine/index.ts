@@ -39,7 +39,7 @@ export function providerFromEnv(env: NodeJS.ProcessEnv = process.env): RenderPro
             renderType: i.kind,
             use: i.use,
             payment: { provider: "PayPal", orderId: i.orderId ?? null, authorizationId: i.authorizationId ?? null },
-            receipt: { store: "Postgres receipts, by render id", signedBy: "Ed25519 (GET /api/receipts/public-key)", verify: `${env.APP_URL ?? ""}/verify` },
+            receipt: { store: "Postgres receipts, by render id", signedBy: "Ed25519 (GET /api/receipts/public-key)", verify: `${env.APP_BASE_URL ?? env.APP_URL ?? ""}/verify` },
             renderer: { provider: "Gemini API", model },
             promptSha256: createHash("sha256").update(i.prompt).digest("hex"),
             createdAt: new Date().toISOString(),

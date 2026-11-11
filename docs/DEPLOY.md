@@ -1,9 +1,80 @@
-# Deploy notes: Render Workflows (research)
+# Deploy: Render (Blueprint) + Neon
+
+One Node web service on Render (`render.yaml`: Starter plan, Virginia, health check `/api/health`), and the existing
+Neon Postgres. Nothing is stored on Render's disk, which is ephemeral.
+
+## Steps
+
+1. **Schema:** the migrations are already applied to Neon (`pnpm db:migrate`, through 0006). Neon is the same
+   database locally and deployed.
+2. **Assets:** run `pnpm seed:assets` locally. It uploads two files from `private/` into Neon:
+   - `rohit.jpg`, sealed with `PHOTO_KEK`
+   - `demo-video.mp4`
+
+   It reads both back to check them.
+3. **Blueprint:** create it in Render from this repo (`render.yaml`). Render asks for every `sync: false` value
+   below. Deploys are manual (`autoDeploy: false`).
+4. **Webhook:** once the service is live at `APP_BASE_URL`, run `pnpm paypal:webhook --url <APP_BASE_URL>` (dry run),
+   then the same with `--confirm`. That registers the PayPal sandbox webhook and writes `PAYPAL_WEBHOOK_ID` to
+   `.env.local`. Set the same value in Render, then redeploy.
+5. **Live check:** `pnpm e2e:live --url <APP_BASE_URL>` runs the engine's four paths on the live server, then waits
+   for their webhooks.
+
+## Environment variables (names only; values never go in git)
+
+| Variable | Value | Notes |
+|---|---|---|
+| `NODE_VERSION` | `22` | set in `render.yaml` |
+| `COREPACK_ENABLE_DOWNLOAD_PROMPT` | `0` | corepack fetches pnpm 12.10.1 without asking |
+| `NEXT_TELEMETRY_DISABLED` | `1` | |
+| `PAYPAL_ENV` | `sandbox` | |
+| `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET` | secret | the same sandbox app as `.env.local` |
+| `PAYPAL_SANDBOX_CREATOR_EMAIL` | secret | the sandbox personal account that receives payouts |
+| `DEMO_VAULT_ID` | secret | the shared sandbox wallet behind "Use demo wallet" (same as local) |
+| `PAYPAL_WEBHOOK_ID` | secret | from `pnpm paypal:webhook --confirm` (step 4) |
+| `APP_BASE_URL` | e.g. `https://likeness-paypal.onrender.com` | PayPal return URLs, receipts, C2PA |
+| `DATABASE_URL` | secret | the Neon connection string (same as local) |
+| `RECEIPT_SIGNING_KEY` | secret, **the SAME as local** | receipts signed locally must keep verifying |
+| `PHOTO_KEK` | secret, **the SAME as local** | opens the sealed reference photo from `seed:assets` |
+| `E2E_TOKEN` | secret, the same as local | enables `POST /api/e2e` for `pnpm e2e:live`; remove it to switch the endpoint off |
+| `CRON_SECRET` | secret, optional | protects `GET /api/cron/settle` |
+| `REVIEW_WINDOW_SECONDS` | `120` | |
+| `SETTLE_LOOP_SECONDS` | `30` | the in-process settle loop (`instrumentation.ts`); `0` turns it off |
+| `RENDER_PROVIDER` | `gemini` | AI renders within the caps; `stub` for no AI calls at all |
+| `GEMINI_API_KEY` | secret | the Gemini API key (new project) |
+| `RENDER_CAP_DAILY`, `RENDER_CAP_PER_WORKSPACE`, `VIDEO_CAP_TOTAL` | `30`, `3`, `3` | atomic counters in Neon (`ai_quota`), shared with local runs |
+| `VIDEO_SECONDS`, `VIDEO_TIMEOUT_MS` | `4`, `300000` | |
+| `C2PA_CERT_PEM`, `C2PA_KEY_PEM` | secret | the test chain from `private/c2pa`, newlines escaped as `\n` (see below); without them renders carry no manifest |
+| `FEATURE_CREATOR_ONBOARDING` | `false` | onboarding stays off: no Google OAuth client, no face models on the server |
+
+To get the C2PA PEMs as one line each (they print key material, so only paste them into Render's secret field):
+`awk 'BEGIN{ORS="\\n"}1' private/c2pa/signer.pem` and the same for `signer.key`.
+
+## How it runs
+
+- **Storage:** everything stored lives in Neon's `blobs` table:
+  - generated images and videos (`render:<id>`)
+  - the sealed reference photo (`asset:rohit-reference`: AES-256-GCM under a data key wrapped by `PHOTO_KEK`)
+  - the demo clip (`asset:demo-video`)
+- **Media access:** `/media/<render id>` serves a file only to the workspace that owns the render's licence; anyone
+  else gets 404.
+- **Settling:** `instrumentation.ts` starts a loop on server start that calls `settle()` every
+  `SETTLE_LOOP_SECONDS`, so renders past their review window are paid out even with no page loads. Dashboard loads
+  and `GET /api/cron/settle` settle too, and all three are idempotent.
+- **Database driver:** Neon's serverless Pool over WebSockets uses Node 22's built-in `WebSocket`. There's no `ws`
+  package and no `neonConfig`; checked on Node 22.23 with a transaction.
+- **Webhooks:** `POST /api/paypal/webhook` verifies every delivery with PayPal
+  (`/v1/notifications/verify-webhook-signature`, `PAYPAL_WEBHOOK_ID`) before acting on it. It records each event
+  once in `paypal_webhook_events`, and mirrors capture, refund, void and payout statuses onto the order and payout
+  rows. Events: the authorization (created, voided), capture (completed, pending, denied, refunded, reversed), payout
+  batch and item, and vault payment-token events listed in `lib/paypal/webhooks.ts`.
+
+## Appendix: Render Workflows (research, not used)
 
 Research only (2026-11-09): nothing is installed or deployed. Items marked **unverified** were not confirmed in the
 docs.
 
-## Summary
+### Summary
 
 - **Yes, there is an official TypeScript SDK:** `@renderinc/sdk`, with workflow helpers in `@renderinc/sdk/workflows`.
   The latest is 1.8.0 (2026-11-06); the docs ask for 1.7.0 or later. Python is also supported.
@@ -16,7 +87,7 @@ docs.
 - **Status:** public beta since 2026-04-07. Whether it is now GA is **unverified**: no GA announcement was found, but
   the docs no longer say beta.
 
-## SDK facts
+### SDK facts
 
 - **npm `@renderinc/sdk`:** first published 2025-12-16; 1.0.0 on 2026-08-21; 1.7.0 on 2026-11-03; 1.8.0 on
   2026-11-06.
@@ -40,7 +111,7 @@ docs.
 - **Idempotency key:** the same key within 24 h returns the original run. It doesn't deduplicate retries inside a run.
 - **Locally:** `render workflows dev -- <start command>` (Render CLI 2.35.0 or later).
 
-## Limits, pricing, deployment
+### Limits, pricing, deployment
 
 - **Duration:** up to 24 h per attempt.
 - **Compute per minute:** Hobby 16 CPU / 64 GB, Pro 32 CPU / 128 GB. Runs over the limit are queued.
@@ -51,7 +122,7 @@ docs.
   - There's no `plan` field there; plans are set per task in code.
   - There's no built-in scheduler; use a Render cron job.
 
-## Mapping D2–D6 (lib/engine/render-and-pay.ts)
+### Mapping D2–D6 (lib/engine/render-and-pay.ts)
 
 The orchestrator task `processRender(renderId)`:
 
@@ -77,7 +148,7 @@ works this way).
 - **Flow alternative:** one `ctx.step` per step. Replays never repeat a capture, but every step needs an explicit
   `retry`, and the feature is one week old.
 
-## Review window (default 120 s)
+### Review window (default 120 s)
 
 - **Deadline:** at capture, the engine stores an absolute `review_deadline`. A retry must never restart the clock.
 - **`awaitReview`:** waits until that stored deadline, checking the row every few seconds, then calls
@@ -88,7 +159,7 @@ works this way).
 - **Backstop:** a cron job calling `GET /api/cron/settle`. Dashboard loads also call `settle()`. This is what runs
   today, with no workflow service at all.
 
-## What stays in the web app (Next.js)
+### What stays in the web app (Next.js)
 
 - **Browser flows:** all UI, the PayPal wallet setup (the buyer approves in a browser) and the vault return route.
 - **Starting a render:** insert the render row, then `startTask(..., { idempotencyKey: renderId })`. Today the engine
@@ -98,14 +169,14 @@ works this way).
 - **Secrets:** `RENDER_API_KEY` goes in the web service. The workflow service gets the PayPal keys, the provider keys
   and `DATABASE_URL`.
 
-## Open questions and risks
+### Open questions and risks
 
 - GA versus beta is **unverified**, and minor versions (1.3, 1.4, 1.5) had breaking changes.
 - Flows are one week old.
 - The Hobby API limit (50 per minute) caps bursts of render starts.
 - The REST endpoint path, idle-wait billing and catching a failed `ctx.run` are all **unverified**.
 
-## Sources (read 2026-11-09)
+### Sources (read 2026-11-09)
 
 - https://render.com/docs/workflows
 - https://render.com/docs/workflows-sdk-typescript
