@@ -11,8 +11,8 @@ import { btnClass, CreatorFace, StatusPill } from "@/components/ds";
 import { PayPalId, renderPill, STATUS_LABEL, usd, when } from "@/components/dashboard/shared";
 import { chipClass, Field, fmtDay, inputClass, StatusBadge } from "@/components/ui";
 import type { brandRenders, brandView } from "@/lib/queries";
-import { isSynthetic, SHARED_PAYOUT_NOTE } from "@/lib/personas";
-import { CreatorBrowse } from "./CreatorBrowse";
+import { IconSearch } from "@/components/ds/icons";
+import { isSynthetic, portraitUrl, SHARED_PAYOUT_NOTE } from "@/lib/personas";
 import { Banner, CHIP, Empty, Fact, MUTED, Monogram, OUTLINE, Panel, Stat, StatsRow, SURFACE, SyntheticBadge } from "./kit";
 
 type View = Awaited<ReturnType<typeof brandView>>;
@@ -46,9 +46,15 @@ export function BrandHome({ v, renders, notice, demoWallet, picked }: { v: View;
           </>
         }
         actions={
-          <Link href="/brand/studio" className={btnClass("lime")}>
-            Open Studio
-          </Link>
+          <>
+            <Link href="/creators" className={btnClass("lime", "gap-2")}>
+              <IconSearch size={18} />
+              Find creators
+            </Link>
+            <Link href="/brand/studio" className={OUTLINE}>
+              Open Studio
+            </Link>
+          </>
         }
       />
 
@@ -124,8 +130,6 @@ export function BrandHome({ v, renders, notice, demoWallet, picked }: { v: View;
         </div>
       </Panel>
 
-      <CreatorBrowse cards={v.cards} requestBase="/brand?creator=" />
-
       <div className="grid grid-cols-1 items-start gap-[18px] lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
         <Panel tone="surface" title="Request a licence" id="request">
           {!req ? (
@@ -134,7 +138,7 @@ export function BrandHome({ v, renders, notice, demoWallet, picked }: { v: View;
             <form key={req.id} action={requestLicence} className="flex flex-col gap-3">
               <input type="hidden" name="creatorId" value={req.id} />
               <div className="flex items-center gap-3">
-                <CreatorFace seed={req.id} photo={req.photoRef ?? "/demo/rohit.svg"} size={56} />
+                <CreatorFace seed={req.id} photo={portraitUrl(req.photoRef) ?? "/demo/rohit.svg"} size={56} />
                 <div className="min-w-0 text-[14px]">
                   <p className="m-0 font-semibold">{req.name}</p>
                   <p className={`m-0 ${MUTED}`}>
@@ -143,7 +147,7 @@ export function BrandHome({ v, renders, notice, demoWallet, picked }: { v: View;
                 </div>
               </div>
               {isSynthetic(req.photoRef) && <SyntheticBadge />}
-              {creators.length > 1 && <p className={`m-0 text-[13px] ${MUTED}`}>Pick another creator with “Request a licence” on their card above.</p>}
+              {creators.length > 1 && <p className={`m-0 text-[13px] ${MUTED}`}>Pick another creator on the <Link href="/creators" className="font-semibold text-ink underline">Creators</Link> page.</p>}
               <Field label="Uses" group>
                 <div className="flex flex-wrap gap-2">
                   {req.allowedUses.map((u) => (

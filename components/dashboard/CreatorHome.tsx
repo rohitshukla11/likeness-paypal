@@ -11,7 +11,7 @@ import { btnClass, StatusPill } from "@/components/ds";
 import { CREATOR_LABEL, PayPalId, renderPill, usd, when } from "@/components/dashboard/shared";
 import { chipClass, Field, fmtDay, inputClass, StatusBadge } from "@/components/ui";
 import { BANNED_USES, USES } from "@/lib/db/schema";
-import { personaOf, SHARED_PAYOUT_NOTE } from "@/lib/personas";
+import { personaOf, portraitUrl, SHARED_PAYOUT_NOTE } from "@/lib/personas";
 import type { creatorView } from "@/lib/queries";
 import { Banner, CHIP, Empty, FaceTile, Fact, MUTED, OUTLINE, OUTLINE_BAD, Panel, Rule, Stat, StatsRow, SURFACE, SyntheticBadge } from "./kit";
 
@@ -27,7 +27,7 @@ export function CreatorHome({ v, notice, reviewEnabled, onboardingLink }: { v: V
     <div className="mx-auto flex w-full max-w-[1320px] flex-col gap-[18px] px-4 pb-12 pt-6 sm:px-8">
       <Banner
         label="Your creator profile"
-        visual={<FaceTile src={c.photoRef ?? "/demo/rohit.svg"} alt={`${c.name}'s reference portrait (${persona?.synthetic ? "synthetic creator, illustration" : "demo illustration"})`} />}
+        visual={<FaceTile src={portraitUrl(c.photoRef) ?? "/demo/rohit.svg"} alt={`${c.name}'s reference portrait${persona?.synthetic ? " (synthetic creator, AI-generated face)" : ""}`} />}
         title={c.name}
         sub="You approve each brand once, within your terms. Every ad made under a licence is paid to your PayPal (90%) when the brand accepts it, and comes with a signed receipt."
         chips={
@@ -37,7 +37,7 @@ export function CreatorHome({ v, notice, reviewEnabled, onboardingLink }: { v: V
               Payouts to {c.payoutPaypalEmail ?? "no PayPal email yet"}
             </span>
             {persona && <span className={`${CHIP} bg-paper text-ink`}>{persona.niche}</span>}
-            {persona?.synthetic ? <SyntheticBadge /> : !c.googleSub && <span className={`${CHIP} bg-paper text-grey`}>Demo creator · illustrated portrait</span>}
+            {persona?.synthetic ? <SyntheticBadge /> : !c.googleSub && <span className={`${CHIP} bg-paper text-grey`}>Demo creator</span>}
           </>
         }
         actions={
@@ -66,7 +66,7 @@ export function CreatorHome({ v, notice, reviewEnabled, onboardingLink }: { v: V
                     className={`inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full border px-3 text-[14px] font-semibold disabled:cursor-default ${me ? "border-ink bg-ink text-white" : "border-field bg-white text-ink hover:border-ink"}`}
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={x.photoRef ?? "/demo/rohit.svg"} alt="" width={28} height={28} className="h-7 w-7 rounded-full object-cover object-top" />
+                    <img src={portraitUrl(x.photoRef) ?? "/demo/rohit.svg"} alt="" width={28} height={28} className="h-7 w-7 rounded-full object-cover object-top" />
                     {x.name}
                     {synthetic && <span className={`text-[11px] font-semibold ${me ? "text-grey-dark" : MUTED}`}>synthetic</span>}
                     {x.waiting > 0 && <span className="rounded-full bg-lime px-2 text-[12px] text-ink">{x.waiting}</span>}

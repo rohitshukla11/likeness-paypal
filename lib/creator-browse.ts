@@ -1,9 +1,9 @@
 /**
  * The brand's view of the creators it can license, and the filter over them. One shape and one filter for both the
- * Brand page's creator browser and the brand agent's list_creators tool, so "find me a fitness creator under $3"
+ * Creators page (/creators, "Find creators" on the Brand page) and the brand agent's list_creators tool, so "find me a fitness creator under $3"
  * gives the agent exactly what the page would show. Pure (no I/O): lib/queries.ts builds the cards.
  */
-import { allowsVideo, nicheOf, personaOf, SYNTHETIC_LABEL } from "./personas";
+import { allowsVideo, nicheOf, personaOf, portraitUrl, SYNTHETIC_LABEL } from "./personas";
 
 export type LicenceStatus = "licensed" | "requested" | "not_yet";
 
@@ -44,7 +44,7 @@ export function toCard(c: CreatorRow, licences: { creatorId: string; state: stri
   return {
     id: c.id,
     name: c.name,
-    photo: c.photoRef ?? "/demo/rohit.svg",
+    photo: portraitUrl(c.photoRef) ?? "/demo/rohit.svg",
     niche: nicheOf(c.photoRef),
     synthetic: personaOf(c.photoRef)?.synthetic ?? false,
     priceImageCents: c.pricePerRenderCents,

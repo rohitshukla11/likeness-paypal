@@ -10,6 +10,13 @@ export const IconPerson = ({ size, className, stroke = "currentColor" }: P) => (
   </svg>
 );
 
+export const IconSearch = ({ size, className, stroke = "currentColor" }: P) => (
+  <svg {...base(size)} className={className} stroke={stroke} strokeWidth="2.4" strokeLinecap="round">
+    <circle cx="11" cy="11" r="7" />
+    <path d="M20 20l-4-4" />
+  </svg>
+);
+
 export const IconCheck = ({ size, className, stroke = "currentColor" }: P) => (
   <svg {...base(size)} className={className} stroke={stroke} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
     <path d="M5 12l5 5L20 7" />

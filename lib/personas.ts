@@ -78,6 +78,15 @@ export function personaOf(photoRef: string | null | undefined): Persona | null {
   return PERSONAS.find((p) => p.photo === photoRef) ?? null;
 }
 
+/**
+ * The portrait a signed-in visitor sees: a seeded persona's photo from its sealed asset (/media/persona/<key>: Rohit's
+ * real photo, or a synthetic creator's AI-generated face), else the row's own photo_ref.
+ */
+export const portraitUrl = (photoRef: string | null | undefined) => {
+  const p = personaOf(photoRef);
+  return p ? `/media/persona/${p.key}` : (photoRef ?? null);
+};
+
 /** Is this creator row a synthetic (fictional, AI-generated) creator? */
 export const isSynthetic = (photoRef: string | null | undefined) => personaOf(photoRef)?.synthetic ?? false;
 

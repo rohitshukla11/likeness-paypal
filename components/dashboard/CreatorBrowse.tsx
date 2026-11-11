@@ -1,7 +1,8 @@
 "use client";
 
 /**
- * The brand's creator browser, adapted from likeness-eth (FaceVisa)'s Creators page: a white header surface with
+ * The Creators page (/creators, opened with "Find creators" on the Brand page), adapted from likeness-eth
+ * (FaceVisa)'s Creators page: a search box with a Search button, then a white header surface with
  * count chips, then a grid of creator cards (portrait, name, labels, Image / Video / Up to facts, terms, an action).
  * Added here: filters for niche, price per image, allowed use, video or images only and licence status, plus a name
  * search. The cards and the filter are lib/creator-browse.ts, the same ones the brand agent's list_creators uses.
@@ -10,6 +11,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { btnClass, StatusPill } from "@/components/ds";
+import { IconSearch } from "@/components/ds/icons";
 import { filterCreators, termsSummary, type CreatorCard, type CreatorFilter } from "@/lib/creator-browse";
 import { CHIP, MUTED, SURFACE, SyntheticBadge } from "./kit";
 
@@ -21,6 +23,8 @@ const selectClass = "min-h-11 w-full min-w-0 rounded-[14px] border border-field 
 /** requestBase: where "Request a licence" goes, with the creator's id appended (e.g. "/brand?creator="). */
 export function CreatorBrowse({ cards, requestBase, studioHref = "/brand/studio" }: { cards: CreatorCard[]; requestBase: string; studioHref?: string }) {
   const [f, setF] = useState<CreatorFilter>({});
+  // The name search applies on Search (or Enter), like a search box; the dropdowns apply at once.
+  const [draft, setDraft] = useState("");
   const set = (patch: Partial<CreatorFilter>) => setF((x) => ({ ...x, ...patch }));
   const shown = useMemo(() => filterCreators(cards, f), [cards, f]);
   const niches = useMemo(() => [...new Set(cards.map((c) => c.niche))].sort(), [cards]);
@@ -44,11 +48,34 @@ export function CreatorBrowse({ cards, requestBase, studioHref = "/brand/studio"
           </div>
         </div>
 
-        <form className="grid grid-cols-2 gap-2 md:grid-cols-[minmax(0,1.4fr)_repeat(5,minmax(0,1fr))]" onSubmit={(e) => e.preventDefault()} aria-label="Filter creators">
-          <label className="col-span-2 flex flex-col gap-1 md:col-span-1">
-            <span className="text-[12px] font-semibold text-grey">Search</span>
-            <input type="search" value={f.q ?? ""} onChange={(e) => set({ q: e.target.value || undefined })} placeholder="Creator name" className={selectClass} />
+        <form
+          role="search"
+          className="flex flex-col gap-2 sm:flex-row"
+          onSubmit={(e) => {
+            e.preventDefault();
+            set({ q: draft.trim() || undefined });
+          }}
+          aria-label="Search creators"
+        >
+          <label className="flex min-w-0 flex-1 flex-col gap-1">
+            <span className="text-[12px] font-semibold text-grey">Search creators</span>
+            <input
+              type="search"
+              value={draft}
+              onChange={(e) => {
+                setDraft(e.target.value);
+                if (!e.target.value) set({ q: undefined });
+              }}
+              placeholder="Name, e.g. Maya"
+              className={selectClass}
+            />
           </label>
+          <button type="submit" className={btnClass("lime", "min-h-11 cursor-pointer gap-2 self-stretch px-6 sm:self-end")}>
+            <IconSearch size={18} />
+            Search
+          </button>
+        </form>
+        <form className="grid grid-cols-2 gap-2 md:grid-cols-5" onSubmit={(e) => e.preventDefault()} aria-label="Filter creators">
           <Select label="Niche" value={f.niche ?? ""} onChange={(v) => set({ niche: v || undefined })} options={[["", "Any niche"], ...niches.map((n) => [n, n] as [string, string])]} />
           <Select
             label="Price per image"
@@ -83,7 +110,13 @@ export function CreatorBrowse({ cards, requestBase, studioHref = "/brand/studio"
             Showing {shown.length} of {cards.length}
           </span>
           {filtered && (
-            <button type="button" onClick={() => setF({})} className="min-h-11 cursor-pointer rounded-full px-3 text-[13px] font-semibold text-ink underline">
+            <button
+              type="button"
+              onClick={() => {
+                setF({});
+                setDraft("");
+              }}
+              className="min-h-11 cursor-pointer rounded-full px-3 text-[13px] font-semibold text-ink underline">
               Clear filters
             </button>
           )}
@@ -96,7 +129,7 @@ export function CreatorBrowse({ cards, requestBase, studioHref = "/brand/studio"
             <li key={c.id} className={`${SURFACE} flex min-w-0 flex-col overflow-hidden`}>
               <div className="relative aspect-[4/3] w-full bg-paper">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={c.photo} alt={`${c.name}${c.synthetic ? " (synthetic creator, illustration)" : " (illustrated portrait)"}`} className="absolute inset-0 h-full w-full object-cover object-[50%_45%]" />
+                <img src={c.photo} alt={`${c.name}${c.synthetic ? " (synthetic creator, AI-generated face)" : ""}`} className="absolute inset-0 h-full w-full object-cover object-[50%_45%]" />
                 <span className={`absolute left-3 top-3 ${CHIP} bg-white/90 text-ink`}>{c.niche}</span>
               </div>
               <div className="flex flex-1 flex-col gap-3 p-4">
@@ -136,7 +169,14 @@ export function CreatorBrowse({ cards, requestBase, studioHref = "/brand/studio"
       ) : (
         <section className={`${SURFACE} flex flex-col items-start gap-2 p-5`}>
           <b className="text-[15px]">No creator matches these filters</b>
-          <button type="button" onClick={() => setF({})} className={btnClass("lime", "min-h-11")}>
+          <button
+            type="button"
+            onClick={() => {
+              setF({});
+              setDraft("");
+            }}
+            className={btnClass("lime", "min-h-11")}
+          >
             Clear filters
           </button>
         </section>
