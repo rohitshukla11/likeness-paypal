@@ -23,6 +23,7 @@ import type { ReceiptPayload, SignedReceipt } from "../receipts";
 import type { ComplianceHook } from "./compliance";
 import { checkRender, splitPayout, utcDayStart, type LicenceView, type MandateView, type RefusalCode, type Verdict } from "./policy";
 import type { RenderProvider } from "./providers";
+import { isStandIn, standInReason } from "./stand-in";
 
 // ---------------------------------------------------------------- Ports
 
@@ -281,7 +282,7 @@ async function produce(r: RenderRow, deps: EngineDeps): Promise<RenderRow> {
   const ctx = await deps.store.context(r.id);
   try {
     const out = await deps.provider.render({ renderId: r.id, kind: r.kind, prompt: r.prompt, use: r.use, workspaceId: ctx.creator.workspaceId, creatorPhotoRef: ctx.creator.photoRef, licenceId: r.licenceId, fromRenderId: r.fromRenderId, aspect: (r.aspect as RenderRequest["aspect"]) ?? null, orderId: r.orderId, authorizationId: r.authorizationId });
-    emit(deps, { renderId: r.id, step: "render", status: "ok", detail: `${r.kind} made with ${out.model}${out.note ? ` (${out.note})` : ""}` });
+    emit(deps, { renderId: r.id, step: "render", status: "ok", detail: isStandIn(out.model) ? `Demo stand-in (no AI call). ${standInReason({ model: out.model, renderNote: out.note ?? null, kind: r.kind })}` : `${r.kind} made with ${out.model}${out.note ? ` (${out.note})` : ""}` });
     const check = await deps.compliance.check({ renderId: r.id, use: r.use, prompt: r.prompt, output: out, creatorPhotoRef: ctx.creator.photoRef });
     if (!check.ok) return fail(r, deps, "voided", "compliance_failed", check.reason, true);
     emit(deps, { renderId: r.id, step: "compliance", status: "ok", detail: check.note ?? "passed" });

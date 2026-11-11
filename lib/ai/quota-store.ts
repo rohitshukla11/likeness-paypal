@@ -1,6 +1,6 @@
 import "server-only";
 /** The AI caps on Postgres: one transaction, one conditional UPDATE per key (count < limit), all or nothing. */
-import { and, eq, lt, sql } from "drizzle-orm";
+import { and, eq, inArray, lt, sql } from "drizzle-orm";
 import { db } from "../db";
 import { aiQuota } from "../db/schema";
 import type { Quota, QuotaKey } from "./quota";
@@ -26,5 +26,11 @@ export class DrizzleQuota implements Quota {
       if (e instanceof Full) return false;
       throw e;
     }
+  }
+
+  async full(keys: QuotaKey[]): Promise<string[]> {
+    if (!keys.length) return [];
+    const rows = await db().select().from(aiQuota).where(inArray(aiQuota.key, keys.map((k) => k.key)));
+    return keys.filter((k) => (rows.find((r) => r.key === k.key)?.count ?? 0) >= k.limit).map((k) => k.key);
   }
 }

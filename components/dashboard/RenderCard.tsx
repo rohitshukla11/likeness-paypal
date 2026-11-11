@@ -8,6 +8,7 @@ import type { ReactNode } from "react";
 import { pillClass, StatusPill } from "@/components/ds";
 import { CREATOR_LABEL, PayPalIds, pipelineLabel, renderPill, short, STATUS_LABEL, usd, when, type Render } from "./shared";
 import { LabelledVideo } from "./LabelledVideo";
+import { isStandIn, standInReason } from "@/lib/engine/stand-in";
 
 export function RenderCard({
   r,
@@ -54,12 +55,12 @@ export function RenderCard({
         </span>
         <span className="tnum text-grey">
           {when(r.createdAt)} · <b className="text-ink">{usd(r.amountCents)}</b>
-          {mode === "creator" && r.status === "accepted" ? ` · you were paid ${usd(r.creatorPayoutCents)}` : ""} · {pipelineLabel(r)}
+          {mode === "creator" && r.status === "accepted" ? ` · you were paid ${usd(r.creatorPayoutCents)}` : ""} · {isStandIn(r.model) ? "demo stand-in (no AI call)" : pipelineLabel(r)}
         </span>
         <span className="text-grey">
           {mode === "brand" ? `Creator: ${name}` : `Brand: ${name}`} · {r.use} · licence {short(r.licenceId)}
         </span>
-        {r.renderNote && <span className="text-[13px] font-medium text-wait">{r.renderNote}</span>}
+        {standInReason(r) && <span className="text-[13px] font-medium text-wait">{standInReason(r)}</span>}
         <span className="text-[13px] text-grey">&ldquo;{r.prompt.length > 160 ? `${r.prompt.slice(0, 157)}…` : r.prompt}&rdquo;</span>
         {refusal && r.status !== "needs_brand_approval" && (
           <span className="text-[13px] text-bad">

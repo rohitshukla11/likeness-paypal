@@ -81,7 +81,7 @@ describe("AiProvider (images)", () => {
     const out = await p.render(input());
     assert.equal(g.calls.length, before, "no AI call over the cap");
     assert.match(out.model, /^stub/);
-    assert.match(out.note!, /AI image cap is reached/);
+    assert.equal(out.note, "AI image cap reached for this demo workspace (3 per workspace): showing a demo stand-in. The PayPal payment is real (sandbox).");
     // another workspace still gets real renders
     const other = await p.render(input({ workspaceId: "ws_2" }));
     assert.equal(other.model, "gemini-nano-banana-2.1");
@@ -93,7 +93,7 @@ describe("AiProvider (images)", () => {
     await p.render(input({ workspaceId: "a" }));
     await p.render(input({ workspaceId: "b" }));
     const out = await p.render(input({ workspaceId: "c" }));
-    assert.match(out.note!, /cap is reached \(2 a day/);
+    assert.equal(out.note, "AI image cap reached today (2/day): showing a demo stand-in. The PayPal payment is real (sandbox).");
   });
 
   it("no reference photo: the stub stands in, no AI call", async () => {
@@ -101,7 +101,7 @@ describe("AiProvider (images)", () => {
     const p = new AiProvider({ quota: new MemoryQuota(), stub: new StubProvider(), references: async () => [], client: g.client, caps });
     const out = await p.render(input());
     assert.equal(g.calls.length, 0);
-    assert.match(out.note!, /no reference photo/);
+    assert.match(out.note!, /^No reference photo of this creator is on file: showing a demo stand-in\. The PayPal payment is real \(sandbox\)\.$/);
   });
 
   it("video without a video renderer or clip: a pre-made animation stands in, labelled", async () => {
@@ -218,7 +218,7 @@ describe("AI video (Gemini Omni Flash)", () => {
     assert.equal(videoCalls, 1, "the cap is total, across workspaces");
     assert.equal(second.mime, "video/mp4");
     assert.equal(Buffer.from(second.bytes!).toString(), "saved-clip");
-    assert.match(second.note!, /demo render/);
+    assert.equal(second.note, "AI video cap reached (1 in total): playing the saved demo clip. The PayPal payment is real (sandbox).");
   });
 
   it("a video failure after the authorization voids it", async () => {
@@ -261,6 +261,6 @@ describe("AI video starts from the generated ad image", () => {
     const out = await p.render(input({ kind: "video" }));
     assert.equal(videoCalls, 0);
     assert.equal(g.calls.length, 0);
-    assert.match(out.note!, /starts from a generated ad image/);
+    assert.match(out.note!, /^A video starts from one of your generated ad images under this licence, and there is none yet: showing a pre-made demo animation\./);
   });
 });

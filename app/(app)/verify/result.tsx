@@ -4,6 +4,7 @@ import { Card, CreatorFace, StatusPill, type PillKind } from "@/components/ds";
 import { IconCheck, IconCross, IconQuestion, IconShield } from "@/components/ds/icons";
 import { SyntheticBadge } from "@/components/dashboard/kit";
 import { PayPalId } from "@/components/dashboard/shared";
+import { isStandIn, PAYMENT_REAL } from "@/lib/engine/stand-in";
 import { isSynthetic, SHARED_PAYOUT_NOTE } from "@/lib/personas";
 import type { VerifyResult } from "@/lib/verify";
 
@@ -83,7 +84,17 @@ export function Result({ result: v }: { result: VerifyResult }) {
                   ["Decision", p.decision.replace("_", "-")],
                   ["Rendered", at(p.renderedAt)],
                   ["Settled", at(p.settledAt)],
-                  ["Model", p.model],
+                  [
+                    "Model",
+                    isStandIn(p.model) ? (
+                      <span key="m">
+                        {p.model}
+                        <span className="block text-[11px] text-grey">Demo stand-in (no AI call). {PAYMENT_REAL}</span>
+                      </span>
+                    ) : (
+                      p.model
+                    ),
+                  ],
                   ["Prompt sha256", <span key="ps" className="break-all font-mono text-[12px]">{p.promptSha256}</span>],
                   ["File sha256", <span key="fs" className="break-all font-mono text-[12px]">{p.outputSha256}</span>],
                 ] as [string, ReactNode][]

@@ -6,11 +6,15 @@
  *   RENDER_CAP_PER_WORKSPACE (3)  Gemini images per demo workspace
  *   VIDEO_CAP_TOTAL (3)           AI videos, ever
  */
+import { STAND_IN } from "../engine/stand-in";
+
 export type QuotaKey = { key: string; limit: number };
 
 export interface Quota {
   /** Takes one unit of every key, or none of them. True if it took them. */
   reserve(keys: QuotaKey[]): Promise<boolean>;
+  /** The keys already at their limit (to say which cap refused). */
+  full?(keys: QuotaKey[]): Promise<string[]>;
 }
 
 const num = (v: string | undefined, d: number) => {
@@ -42,4 +46,14 @@ export class MemoryQuota implements Quota {
     for (const k of keys) this.counts.set(k.key, (this.counts.get(k.key) ?? 0) + 1);
     return true;
   }
+  async full(keys: QuotaKey[]) {
+    return keys.filter((k) => (this.counts.get(k.key) ?? 0) >= k.limit).map((k) => k.key);
+  }
+}
+
+/** Which image cap refused, in plain words: the daily one, or this demo workspace's. */
+export async function imageCapReason(quota: Quota, keys: QuotaKey[], caps: AiCaps): Promise<string> {
+  const full = (await quota.full?.(keys).catch(() => [])) ?? [];
+  const daily = keys[0]?.key;
+  return full.length && !full.includes(daily) ? STAND_IN.imageWorkspace(caps.imagePerWorkspace) : STAND_IN.imageDaily(caps.imageDaily);
 }

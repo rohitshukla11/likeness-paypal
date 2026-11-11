@@ -25,7 +25,8 @@ import { promptsFor, type EthAspect } from "./eth-prompts";
 import { generateContent, geminiConfigured, geminiModels, type GenAiLike } from "./gemini";
 import { labelRender } from "./label";
 import type { Reference } from "./provider";
-import { aiCaps, imageKeys, videoKeys, type AiCaps, type Quota } from "./quota";
+import { STAND_IN, standInNote } from "../engine/stand-in";
+import { aiCaps, imageCapReason, imageKeys, videoKeys, type AiCaps, type Quota } from "./quota";
 
 export const ETH_VIDEO_ASPECT = "16:9" as const;
 const MAX_REFERENCES = 3;
@@ -149,13 +150,12 @@ export class EthProvider implements RenderProvider {
   }
 
   private async image(input: RenderInput): Promise<RenderOutput> {
-    if (!this.deps.client && !geminiConfigured()) return this.standIn(input, "Demo render: Gemini isn't configured (GEMINI_API_KEY), so a pre-made image stands in.");
+    if (!this.deps.client && !geminiConfigured()) return this.standIn(input, standInNote(STAND_IN.noKey));
     const refs = await this.deps.references(input);
-    if (!refs.length) return this.standIn(input, "Demo render: there is no reference photo of this creator on file, so a pre-made image stands in.");
+    if (!refs.length) return this.standIn(input, standInNote(STAND_IN.noReference));
     const caps = this.caps;
-    if (!(await this.deps.quota.reserve(imageKeys(input.workspaceId, this.now(), caps)))) {
-      return this.standIn(input, `Demo render: the AI image cap is reached (${caps.imageDaily} a day, ${caps.imagePerWorkspace} per workspace), so a pre-made image stands in.`);
-    }
+    const keys = imageKeys(input.workspaceId, this.now(), caps);
+    if (!(await this.deps.quota.reserve(keys))) return this.standIn(input, standInNote(await imageCapReason(this.deps.quota, keys, caps)));
     const aspect = input.aspect ?? "1:1";
     const still = await this.checkedStill(input, refs, promptsFor("image", input.prompt, aspect).still, aspect);
     const labelled = new Uint8Array(await labelRender(still.bytes));
@@ -164,17 +164,17 @@ export class EthProvider implements RenderProvider {
   }
 
   private async video(input: RenderInput): Promise<RenderOutput> {
-    const clip = async (note: string): Promise<RenderOutput> => {
+    const clip = async (reason: string): Promise<RenderOutput> => {
       const bytes = await this.deps.demoClip?.();
-      if (!bytes) return this.standIn(input, `${note} The saved demo clip isn't there yet, so a pre-made animation stands in.`);
-      return { outputRef: "", bytes, sha256: sha(bytes), mime: "video/mp4", model: "demo clip (pre-recorded)", note: `${note} A saved demo clip plays instead: demo render.` };
+      if (!bytes) return this.standIn(input, standInNote(reason, "animation"));
+      return { outputRef: "", bytes, sha256: sha(bytes), mime: "video/mp4", model: "demo clip (pre-recorded)", note: standInNote(reason, "clip") };
     };
-    if (!this.deps.video) return clip("Demo render: AI video isn't enabled.");
-    if (!this.deps.client && !geminiConfigured()) return clip("Demo render: Gemini isn't configured (GEMINI_API_KEY).");
+    if (!this.deps.video) return clip(STAND_IN.videoOff);
+    if (!this.deps.client && !geminiConfigured()) return clip(STAND_IN.noKey);
     const refs = await this.deps.references(input);
-    if (!refs.length) return clip("Demo render: there is no reference photo of this creator on file.");
+    if (!refs.length) return clip(STAND_IN.noReference);
     const caps = this.caps;
-    if (!(await this.deps.quota.reserve(videoKeys(caps)))) return clip(`Demo render: the AI video cap (${caps.videoTotal} in total) is reached.`);
+    if (!(await this.deps.quota.reserve(videoKeys(caps)))) return clip(STAND_IN.videoTotal(caps.videoTotal));
     // Its own opening still, from the reference photos (covered by the video's price and its video slot).
     const p = promptsFor("video", input.prompt);
     const still = await this.checkedStill(input, refs, p.still, ETH_VIDEO_ASPECT);

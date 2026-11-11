@@ -12,6 +12,7 @@ import type { GenAiLike } from "../lib/ai/gemini";
 import { MemoryQuota } from "../lib/ai/quota";
 import { StubProvider, type RenderInput } from "../lib/engine/providers";
 import { renderAndPay } from "../lib/engine/render-and-pay";
+import { standInReason } from "../lib/engine/stand-in";
 import { testEngine } from "./fakes";
 
 const caps = { imageDaily: 30, imagePerWorkspace: 3, videoTotal: 3 };
@@ -117,7 +118,7 @@ describe("EthProvider (images)", () => {
     const g = await fakeGemini();
     const out = await new EthProvider({ quota: new MemoryQuota(), stub: new StubProvider(), references: ref, client: g.client, caps: { ...caps, imagePerWorkspace: 0 } }).render(input());
     assert.equal(g.calls.length, 0);
-    assert.match(out.note!, /image cap is reached/);
+    assert.match(out.note!, /^AI image cap reached for this demo workspace \(0 per workspace\): showing a demo stand-in\. The PayPal payment is real \(sandbox\)\.$/);
   });
 
   it("a face check that can't run accepts the image (the engine's compliance check still judges it)", async () => {
@@ -181,5 +182,24 @@ describe("engine with the EthProvider", () => {
     assert.equal(r.status, "voided");
     assert.equal(t.calls.filter((c) => c.op === "captureAuthorization").length, 0);
     assert.equal(t.calls.filter((c) => c.op === "voidAuthorization").length, 1);
+  });
+});
+
+describe("stand-in reasons in plain words", () => {
+  it("the stub on its own says demo mode, and the payment is real", async () => {
+    const out = await new StubProvider().render(input());
+    assert.equal(out.note, "Demo mode: AI generation is off on this server: showing a demo stand-in. The PayPal payment is real (sandbox).");
+  });
+  it("older demo renders stored without a note get the demo-mode reason; AI renders keep theirs", () => {
+    assert.equal(standInReason({ model: "stub-image (pre-generated)", renderNote: null }), "Demo mode: AI generation is off on this server: showing a demo stand-in. The PayPal payment is real (sandbox).");
+    assert.equal(standInReason({ model: "stub-video (pre-generated)", renderNote: null, kind: "video" }), "Demo mode: AI generation is off on this server: showing a pre-made demo animation. The PayPal payment is real (sandbox).");
+    assert.equal(standInReason({ model: "gemini-nano-banana-2.1", renderNote: null }), null);
+  });
+  it("the step stream says why a stand-in was shown", async () => {
+    const t = testEngine({ provider: new StubProvider() });
+    const steps: { step: string; detail?: string }[] = [];
+    t.deps.onStep = (e) => e && steps.push({ step: e.step, detail: e.detail });
+    await renderAndPay({ renderId: "rnd_stub1", licenceId: "lic_1", mandateId: "man_1", kind: "image", use: "advertising", prompt: "Rohit with a coffee cup" }, t.deps);
+    assert.match(steps.find((s) => s.step === "render")!.detail!, /^Demo stand-in \(no AI call\)\. /);
   });
 });

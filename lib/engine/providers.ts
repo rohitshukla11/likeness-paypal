@@ -8,6 +8,7 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { STAND_IN, standInNote } from "./stand-in";
 
 export interface RenderInput {
   renderId: string;
@@ -57,6 +58,12 @@ export class StubProvider implements RenderProvider {
     const pool = input.kind === "video" ? VIDEOS : IMAGES;
     const pick = pool[parseInt(createHash("sha256").update(input.prompt).digest("hex").slice(0, 8), 16) % pool.length];
     const bytes = await readFile(path.join(this.publicDir, "demo", pick));
-    return { outputRef: `/demo/${pick}`, sha256: createHash("sha256").update(bytes).digest("hex"), mime: "image/svg+xml", model: input.kind === "video" ? "stub-video (pre-generated)" : "stub-image (pre-generated)" };
+    return {
+      outputRef: `/demo/${pick}`,
+      sha256: createHash("sha256").update(bytes).digest("hex"),
+      mime: "image/svg+xml",
+      model: input.kind === "video" ? "stub-video (pre-generated)" : "stub-image (pre-generated)",
+      note: standInNote(STAND_IN.off, input.kind === "video" ? "animation" : "image"),
+    };
   }
 }
