@@ -10,6 +10,8 @@
  */
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { useFormStatus } from "react-dom";
+import { requestLicence } from "@/app/(app)/brand/actions";
 import { btnClass, StatusPill } from "@/components/ds";
 import { IconSearch } from "@/components/ds/icons";
 import { filterCreators, termsSummary, type CreatorCard, type CreatorFilter } from "@/lib/creator-browse";
@@ -20,8 +22,8 @@ const PRICES = [200, 300, 500] as const;
 const USES = ["advertising", "social", "editorial", "internal"] as const;
 const selectClass = "min-h-11 w-full min-w-0 rounded-[14px] border border-field bg-white px-3 text-[14px] text-ink";
 
-/** requestBase: where "Request a licence" goes, with the creator's id appended (e.g. "/brand?creator="). */
-export function CreatorBrowse({ cards, requestBase, studioHref = "/brand/studio" }: { cards: CreatorCard[]; requestBase: string; studioHref?: string }) {
+/** The cards' "Request a licence" sends the request at once, within the creator's terms (requestLicence). */
+export function CreatorBrowse({ cards, studioHref = "/brand/studio" }: { cards: CreatorCard[]; studioHref?: string }) {
   const [f, setF] = useState<CreatorFilter>({});
   // The name search applies on Search (or Enter), like a search box; the dropdowns apply at once.
   const [draft, setDraft] = useState("");
@@ -157,9 +159,17 @@ export function CreatorBrowse({ cards, requestBase, studioHref = "/brand/studio"
                   ) : c.licence === "requested" ? (
                     <span className={`text-[13px] ${MUTED}`}>Waiting for {c.name} to approve</span>
                   ) : c.accepting ? (
-                    <Link href={`${requestBase}${encodeURIComponent(c.id)}#request`} className={btnClass("lime", "min-h-11 self-start")} scroll={false}>
-                      Request a licence
-                    </Link>
+                    <form action={requestLicence} className="flex flex-col gap-1.5">
+                      <input type="hidden" name="creatorId" value={c.id} />
+                      <input type="hidden" name="uses" value={c.uses.includes("advertising") ? "advertising" : c.uses[0]} />
+                      <input type="hidden" name="renderCap" value={Math.min(5, c.maxRenders)} />
+                      <input type="hidden" name="days" value={Math.min(14, c.maxDays)} />
+                      <input type="hidden" name="brief" value={`${c.uses.includes("advertising") ? "Advertising" : c.uses[0][0].toUpperCase() + c.uses[0].slice(1)} ads with ${c.name} for our next campaign.`} />
+                      <RequestButton />
+                      <span className={`text-[12px] ${MUTED}`}>
+                        {c.uses.includes("advertising") ? "advertising" : c.uses[0]}, {Math.min(5, c.maxRenders)} renders over {Math.min(14, c.maxDays)} days
+                      </span>
+                    </form>
                   ) : null}
                 </div>
               </div>
@@ -182,6 +192,15 @@ export function CreatorBrowse({ cards, requestBase, studioHref = "/brand/studio"
         </section>
       )}
     </section>
+  );
+}
+
+function RequestButton() {
+  const { pending } = useFormStatus();
+  return (
+    <button type="submit" disabled={pending} className={btnClass("lime", "min-h-11 cursor-pointer self-start disabled:opacity-60")}>
+      {pending ? "Sending…" : "Request a licence"}
+    </button>
   );
 }
 

@@ -20,6 +20,5 @@ async function Brand({ searchParams }: PageProps<"/brand">) {
   if (!s) redirect("/");
   const q = await searchParams;
   const [v, renders] = await Promise.all([brandView(s.brandId), brandRenders(s.brandId)]);
-  const picked = typeof q.creator === "string" ? q.creator : null;
-  return <BrandHome v={v} renders={renders} notice={<Notice ok={q.ok} error={q.error} />} demoWallet={demoWalletAvailable()} picked={picked} />;
+  return <BrandHome v={v} renders={renders} notice={<Notice ok={q.ok} error={q.error} />} demoWallet={demoWalletAvailable()} />;
 }
