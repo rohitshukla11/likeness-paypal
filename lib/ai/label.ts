@@ -1,11 +1,11 @@
 import "server-only";
 /**
  * The visible "AI-generated · licensed likeness" label: small (24% of the width, at least 220 px),
- * semi-transparent, bottom-left in a 4% safe area, moved to another corner if it would cover the face
- * or the area below it (lib/server/framing.ts, labelSpot). Images here; videos in motion.ts.
+ * semi-transparent, bottom-left in a 4% safe area. (likeness-ai moved it away from the face with its ONNX face
+ * models; this app doesn't ship those models, so the label stays bottom-left.) Images only: there is no ffmpeg
+ * here to burn it into video, so videos carry the label in the page, the receipt and the content credential.
  */
 import sharp from "sharp";
-import { faceBoxes, labelSpot, type Box } from "./framing";
 import { LABEL_AI_RENDER, WATERMARK_PROFILE } from "./watermarks";
 
 export const LABEL_OPACITY = 0.75;
@@ -19,19 +19,17 @@ export async function labelPng(w: number): Promise<{ png: Buffer; w: number; h: 
   return { png, w: info.width, h: info.height };
 }
 
-/** Faces for label placement; without the face models the label simply goes bottom-left. */
-export async function facesForLabel(bytes: Uint8Array): Promise<Box[]> {
-  return faceBoxes(bytes).then(
-    (r) => r.faces,
-    () => [],
-  );
+/** Bottom-left inside a 4% safe area. */
+export function labelSpot(W: number, H: number, label: { w: number; h: number }) {
+  const m = Math.round(Math.min(W, H) * 0.04);
+  return { x: m, y: Math.max(0, H - label.h - m) };
 }
 
 export async function labelRender(bytes: Uint8Array): Promise<Buffer> {
   const upright = await sharp(bytes).rotate().jpeg({ quality: 95 }).toBuffer();
   const { width = 1024, height = 1024 } = await sharp(upright).metadata();
   const label = await labelPng(labelWidth(width));
-  const spot = labelSpot(width, height, label, await facesForLabel(new Uint8Array(upright)));
+  const spot = labelSpot(width, height, label);
   return sharp(upright).composite([{ input: label.png, left: spot.x, top: spot.y }]).jpeg({ quality: 92 }).toBuffer();
 }
 

@@ -51,7 +51,8 @@ export class MemoryStore implements EngineStore {
   orders = new Map<string, Record<string, unknown>>();
   payouts = new Map<string, Record<string, unknown>>();
   receipts = new Map<string, SignedReceipt>();
-  creator = { id: "cre_1", photoRef: "/demo/rohit.svg", payoutPaypalEmail: "creator@example.com" as string | null };
+  creator = { id: "cre_1", photoRef: "/demo/rohit.svg", payoutPaypalEmail: "creator@example.com" as string | null, workspaceId: "ws_1" as string | null };
+  media = new Map<string, { bytes: Uint8Array; mime: string; sha256: string }>();
 
   constructor(
     public licence: TestLicence,
@@ -90,6 +91,7 @@ export class MemoryStore implements EngineStore {
           outputSha256: null,
           outputMime: null,
           model: null,
+          renderNote: null,
           orderId: null,
           authorizationId: null,
           captureId: null,
@@ -145,6 +147,10 @@ export class MemoryStore implements EngineStore {
 
   async saveReceipt(renderId: string, r: SignedReceipt) {
     if (!this.receipts.has(renderId)) this.receipts.set(renderId, r);
+  }
+
+  async saveMedia(renderId: string, m: { bytes: Uint8Array; mime: string; sha256: string }) {
+    if (!this.media.has(renderId)) this.media.set(renderId, m);
   }
 
   async due(now: Date, staleMs: number) {

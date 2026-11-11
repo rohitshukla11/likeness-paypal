@@ -67,6 +67,7 @@ export interface RenderRow {
   outputSha256: string | null;
   outputMime: string | null;
   model: string | null;
+  renderNote: string | null;
   orderId: string | null;
   authorizationId: string | null;
   captureId: string | null;
@@ -82,7 +83,7 @@ export interface RenderRow {
 
 export interface RenderContext {
   render: RenderRow;
-  creator: { id: string; photoRef: string | null; payoutPaypalEmail: string | null };
+  creator: { id: string; photoRef: string | null; payoutPaypalEmail: string | null; workspaceId: string | null };
   brandId: string;
   paymentTokenId: string | null;
 }
@@ -120,6 +121,8 @@ export interface EngineStore {
   recordOrder(o: { orderId: string; paymentTokenId: string | null; status: string; authorizationId?: string | null; authorizationStatus?: string | null; captureId?: string | null; refundId?: string | null; amountCents: number; customId: string }): Promise<void>;
   recordPayout(p: { senderBatchId: string; payoutBatchId: string; receiverEmail: string; amountCents: number; status: string }): Promise<void>;
   saveReceipt(renderId: string, r: SignedReceipt): Promise<void>;
+  /** Stores a generated file with its render (served at /media/<render id>). Idempotent. */
+  saveMedia(renderId: string, m: { bytes: Uint8Array; mime: string; sha256: string }): Promise<void>;
   /**
    * Renders to settle now: in_review past their deadline, settling/refunding ones idle for over `staleMs`, and
    * accepted/rejected ones still missing their receipt.
@@ -235,11 +238,17 @@ async function authorize(r: RenderRow, deps: EngineDeps): Promise<RenderRow> {
 async function produce(r: RenderRow, deps: EngineDeps): Promise<RenderRow> {
   const ctx = await deps.store.context(r.id);
   try {
-    const out = await deps.provider.render({ renderId: r.id, kind: r.kind, prompt: r.prompt, creatorPhotoRef: ctx.creator.photoRef });
+    const out = await deps.provider.render({ renderId: r.id, kind: r.kind, prompt: r.prompt, use: r.use, workspaceId: ctx.creator.workspaceId, creatorPhotoRef: ctx.creator.photoRef });
     const check = await deps.compliance.check({ renderId: r.id, use: r.use, prompt: r.prompt, output: out });
     if (!check.ok) return fail(r, deps, "voided", "compliance_failed", check.reason, true);
+    let outputRef = out.outputRef;
+    if (out.bytes) {
+      await deps.store.saveMedia(r.id, { bytes: out.bytes, mime: out.mime, sha256: out.sha256 });
+      outputRef = `/media/${r.id}`;
+    }
     return (
-      (await deps.store.update(r.id, { status: "capturing", outputRef: out.outputRef, outputSha256: out.sha256, outputMime: out.mime, model: out.model }, ["rendering"])) ?? (await mustGet(r.id, deps))
+      (await deps.store.update(r.id, { status: "capturing", outputRef, outputSha256: out.sha256, outputMime: out.mime, model: out.model, renderNote: out.note ?? null }, ["rendering"])) ??
+      (await mustGet(r.id, deps))
     );
   } catch (e) {
     return fail(r, deps, "voided", "render_failed", describe(e), true);

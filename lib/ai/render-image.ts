@@ -1,15 +1,14 @@
 import "server-only";
 /**
- * Gemini image generation from the creator's reference frames (gemini-nano-banana-2.1 on Vertex AI).
- * One generateContent call: the reference frames as inline images, then the brand's brief, with
+ * Gemini image generation from the creator's reference photo (gemini-nano-banana-2.1 on the Gemini API). One
+ * generateContent call: the reference photos as inline images, then the brand's brief and our framing rules, with
  * responseModalities ["IMAGE"]. The image comes back inline (base64), so nothing is fetched from a URL.
- *
- * Google adds an invisible SynthID watermark to images these models generate, a second, independent
- * provenance signal next to our C2PA manifest and KMS-signed receipt.
+ * Google adds an invisible SynthID watermark to images these models generate; we add a visible label (label.ts)
+ * and the signed receipt.
  */
-import { generateContent, geminiModels } from "../gemini";
-import { stillRules, type Aspect } from "@/lib/creative";
-import type { RenderInput, RenderOutput } from "./types";
+import { stillRules, type Aspect } from "./creative";
+import { generateContent, geminiModels, type GenAiLike } from "./gemini";
+import type { GeneratedMedia, ImageRenderInput } from "./types";
 
 const MAX_REFERENCES = 3;
 
@@ -24,25 +23,26 @@ export function referencePrompt(prompt: string, n: number, aspect: Aspect = "1:1
   ].join("\n");
 }
 
-export async function geminiRender(input: RenderInput): Promise<RenderOutput> {
+export async function geminiImage(input: ImageRenderInput, client?: GenAiLike): Promise<GeneratedMedia> {
   const model = geminiModels.image();
   const refs = input.references.slice(0, MAX_REFERENCES);
-  const res = await generateContent(model, {
-    contents: [
+  if (!refs.length) throw new Error("no reference photo of the creator");
+  const aspect = input.aspectRatio ?? "1:1";
+  const res = await generateContent(
+    model,
+    [
       {
         role: "user",
-        parts: [
-          ...refs.map((r) => ({ inlineData: { mimeType: "image/jpeg", data: Buffer.from(r).toString("base64") } })),
-          { text: referencePrompt(input.prompt, refs.length, input.aspectRatio ?? "1:1") },
-        ],
+        parts: [...refs.map((r) => ({ inlineData: { mimeType: r.mime, data: Buffer.from(r.bytes).toString("base64") } })), { text: referencePrompt(input.prompt, refs.length, aspect) }],
       },
     ],
-    generationConfig: { responseModalities: ["IMAGE"], imageConfig: { aspectRatio: input.aspectRatio || process.env.GEMINI_ASPECT_RATIO || "1:1", imageSize: process.env.GEMINI_IMAGE_SIZE || "1K" } },
-  });
+    { responseModalities: ["IMAGE"], imageConfig: { aspectRatio: aspect, imageSize: process.env.GEMINI_IMAGE_SIZE || "1K" } },
+    { client },
+  );
   if (res.promptFeedback?.blockReason) throw new Error(`Gemini blocked the request: ${res.promptFeedback.blockReason} ${res.promptFeedback.blockReasonMessage ?? ""}`.trim());
   const c = res.candidates?.[0];
   const image = c?.content?.parts?.find((p) => p.inlineData?.data && !p.thought)?.inlineData;
-  if (!image) throw new Error(`Gemini returned no image (finishReason ${c?.finishReason ?? "none"}${c?.finishMessage ? `: ${c.finishMessage}` : ""})`);
+  if (!image?.data) throw new Error(`Gemini returned no image (finishReason ${c?.finishReason ?? "none"}${c?.finishMessage ? `: ${c.finishMessage}` : ""})`);
   const mime = image.mimeType === "image/jpeg" ? "image/jpeg" : "image/png";
-  return { bytes: new Uint8Array(Buffer.from(image.data, "base64")), mime, provider: "gemini", model, test: false, usage: res.usageMetadata };
+  return { bytes: new Uint8Array(Buffer.from(image.data, "base64")), mime, model, usage: res.usageMetadata as Record<string, unknown> | undefined };
 }

@@ -2,7 +2,7 @@ import "server-only";
 /** The engine's store on Postgres (Drizzle). admit() is the policy transaction: licence and mandate locked FOR UPDATE. */
 import { and, eq, gte, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { db, type Db } from "../db";
-import { creators, licences, mandates, paypalOrders, paypalPayouts, receipts, refusals, renders } from "../db/schema";
+import { creators, licences, mandates, paypalOrders, paypalPayouts, receipts, refusals, renderMedia, renders } from "../db/schema";
 import { newId } from "../errors";
 import type { SignedReceipt } from "../receipts";
 import type { EngineStore, RenderContext, RenderRow, RenderStatus } from "./render-and-pay";
@@ -55,7 +55,7 @@ export class DrizzleStore implements EngineStore {
 
   async context(renderId: string): Promise<RenderContext> {
     const [x] = await this.database()
-      .select({ render: renders, creator: { id: creators.id, photoRef: creators.photoRef, payoutPaypalEmail: creators.payoutPaypalEmail }, brandId: licences.brandId, paymentTokenId: mandates.paymentTokenId })
+      .select({ render: renders, creator: { id: creators.id, photoRef: creators.photoRef, payoutPaypalEmail: creators.payoutPaypalEmail, workspaceId: creators.workspaceId }, brandId: licences.brandId, paymentTokenId: mandates.paymentTokenId })
       .from(renders)
       .innerJoin(licences, eq(licences.id, renders.licenceId))
       .innerJoin(creators, eq(creators.id, licences.creatorId))
@@ -108,6 +108,10 @@ export class DrizzleStore implements EngineStore {
       .insert(receipts)
       .values({ id: r.payload.receiptId, renderId, canonicalPayload: r.canonical, payloadSha256: r.payloadSha256, signature: r.signature, alg: r.alg, keyId: r.keyId, status: r.payload.status, outputSha256: r.payload.outputSha256 || null })
       .onConflictDoNothing({ target: receipts.renderId });
+  }
+
+  async saveMedia(renderId: string, m: { bytes: Uint8Array; mime: string; sha256: string }) {
+    await this.database().insert(renderMedia).values({ renderId, mime: m.mime, sha256: m.sha256, bytes: Buffer.from(m.bytes) }).onConflictDoNothing();
   }
 
   async due(now: Date, staleMs: number) {

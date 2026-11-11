@@ -27,7 +27,10 @@ export function RenderCard({
   const label = (mode === "brand" ? STATUS_LABEL : CREATOR_LABEL)[r.status] ?? r.status;
   const kind = r.kind === "video" ? "Video ad" : "Image ad";
 
-  const media = r.outputRef ? (
+  const ai = !!r.model && !r.model.startsWith("stub") && !r.model.startsWith("demo clip");
+  const media = r.outputRef && r.outputMime === "video/mp4" ? (
+    <video src={r.outputRef} controls muted playsInline preload="metadata" aria-label={`${kind} for ${mode === "brand" ? name : "you"}: ${r.prompt}`} className="aspect-square w-full shrink-0 rounded-[12px] bg-ink object-cover sm:w-[240px]" />
+  ) : r.outputRef ? (
     <a href={r.outputRef} target="_blank" rel="noreferrer" className="block shrink-0 rounded-[12px]" aria-label={`Open the full ${kind.toLowerCase()} (new tab)`}>
       {/* Plain <img> as in likeness-ai: a fixed square box, object-cover, so the aspect ratio is never distorted. */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -45,7 +48,7 @@ export function RenderCard({
       <div className="flex min-w-0 flex-1 flex-col gap-1.5 text-[14px]">
         <span className="flex flex-wrap items-center gap-2">
           <b>{kind}</b>
-          <span className="rounded-full bg-ink px-2.5 py-0.5 text-[12px] font-semibold text-lime">Demo render · licensed likeness</span>
+          <span className="rounded-full bg-ink px-2.5 py-0.5 text-[12px] font-semibold text-lime">{ai ? "AI-generated" : "Demo render"} · licensed likeness</span>
           <StatusPill kind={renderPill(r.status)}>{label}</StatusPill>
         </span>
         <span className="tnum text-grey">
@@ -55,6 +58,7 @@ export function RenderCard({
         <span className="text-grey">
           {mode === "brand" ? `Creator: ${name}` : `Brand: ${name}`} · {r.use} · licence {short(r.licenceId)}
         </span>
+        {r.renderNote && <span className="text-[13px] font-medium text-wait">{r.renderNote}</span>}
         <span className="text-[13px] text-grey">&ldquo;{r.prompt.length > 160 ? `${r.prompt.slice(0, 157)}…` : r.prompt}&rdquo;</span>
         {refusal && r.status !== "needs_brand_approval" && (
           <span className="text-[13px] text-bad">

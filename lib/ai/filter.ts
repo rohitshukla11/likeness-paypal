@@ -1,15 +1,23 @@
 import "server-only";
 /**
- * Prompt check before any render. Two layers:
+ * Prompt check before any AI render. Two layers:
  *  1. Local rules, always: keyword and phrase rules for the five banned uses (political, adult,
  *     minors, impersonation, deception). Cheap, deterministic, and blunt.
- *  2. A Gemini classifier (gemini-3.5-flash-lite on Vertex AI) with structured JSON output: banned-use
- *     judgement plus whether the prompt fits the licence's one licensed category. If the call fails,
- *     the render is refused (fail closed), never waved through.
- * Without a Google Cloud project configured, the result says "LLM filter not configured" and only the rules ran.
+ *  2. A Gemini classifier (gemini-3.5-flash-lite on the Gemini API, GEMINI_API_KEY) with structured JSON output:
+ *     banned-use judgement plus whether the prompt fits the licensed use. If the call fails, the render is
+ *     refused (fail closed), never waved through.
+ * Without GEMINI_API_KEY, the result says "LLM filter not configured" and only the rules ran.
  */
-import { BANNED, CATEGORIES } from "@/lib/categories";
-import { generateContent, geminiModels, vertexConfigured } from "./gemini";
+import { generateContent, geminiConfigured, geminiModels, type GenAiLike } from "./gemini";
+
+/** The banned uses and how they read in a refusal. */
+export const BANNED = [
+  { key: "political", label: "Political" },
+  { key: "adult", label: "Adult" },
+  { key: "minors", label: "Minors" },
+  { key: "impersonation", label: "Impersonation" },
+  { key: "deception", label: "Deception" },
+] as const;
 
 export type FilterResult = {
   allowed: boolean;
@@ -66,7 +74,7 @@ Banned uses, never allowed under any licence:
 - minors: anything involving minors or a childlike depiction;
 - impersonation: presenting the person as someone else, or as endorsing or saying something they did not;
 - deception: fake news, fake evidence, fake testimonials, depicting crimes or events as real.
-The licence covers exactly one use category. Decide whether the prompt fits it.
+The render is made under one licensed use (for example advertising or social). Decide whether the prompt fits it.
 Return JSON matching the schema.`;
 
 // JSON Schema for generationConfig.responseJsonSchema (responseSchema is deprecated).
@@ -80,25 +88,23 @@ const FILTER_SCHEMA = {
   required: ["banned", "fitsCategory", "reason"],
 };
 
-async function geminiCheck(prompt: string, category: string): Promise<{ banned: string[]; fitsCategory: boolean; reason: string }> {
+async function geminiCheck(prompt: string, category: string, client?: GenAiLike): Promise<{ banned: string[]; fitsCategory: boolean; reason: string }> {
   const res = await generateContent(
     geminiModels.filter(),
-    {
-      systemInstruction: { parts: [{ text: FILTER_INSTRUCTION }] },
-      contents: [{ role: "user", parts: [{ text: `Licence category: ${category}\nPrompt: ${prompt}` }] }],
-      generationConfig: { temperature: 0, responseMimeType: "application/json", responseJsonSchema: FILTER_SCHEMA },
-    },
-    20_000,
+    [{ role: "user", parts: [{ text: `Licensed use: ${category}\nPrompt: ${prompt}` }] }],
+    { systemInstruction: FILTER_INSTRUCTION, temperature: 0, responseMimeType: "application/json", responseJsonSchema: FILTER_SCHEMA },
+    { timeoutMs: 20_000, client },
   );
   if (res.promptFeedback?.blockReason) return { banned: ["blocked by Gemini safety"], fitsCategory: false, reason: res.promptFeedback.blockReason };
-  const text = res.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";
+  const text = res.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text ?? "").join("") ?? "";
   const out = JSON.parse(text);
   if (!Array.isArray(out.banned) || typeof out.fitsCategory !== "boolean") throw new Error("Gemini filter returned an unexpected shape");
   return { banned: out.banned.map(String), fitsCategory: out.fitsCategory, reason: String(out.reason ?? "") };
 }
 
-export async function checkPrompt(prompt: string, categoryBit: number): Promise<FilterResult> {
-  const category = CATEGORIES.find((c) => c.bit === categoryBit)?.label ?? "unknown";
+/** `use` is the licensed use the render is made under (advertising, social, …). */
+export async function checkPrompt(prompt: string, use: string, client?: GenAiLike): Promise<FilterResult> {
+  const category = use;
   const reasons: string[] = [];
   const layers: FilterResult["layers"] = [];
 
@@ -108,9 +114,9 @@ export async function checkPrompt(prompt: string, categoryBit: number): Promise<
   reasons.push(...hits.map((h) => `banned use (rules) — ${h}`));
   layers.push({ name: "Local banned-use rules", ran: true });
 
-  if (vertexConfigured()) {
+  if (client || geminiConfigured()) {
     try {
-      const q = await geminiCheck(prompt, category);
+      const q = await geminiCheck(prompt, category, client);
       for (const b of q.banned) reasons.push(`banned use (Gemini) — ${b}: ${q.reason}`);
       if (!q.fitsCategory) reasons.push(`outside the licensed use (${category}) — ${q.reason}`);
       layers.push({ name: `Gemini LLM filter (${geminiModels.filter()})`, ran: true });
@@ -119,7 +125,7 @@ export async function checkPrompt(prompt: string, categoryBit: number): Promise<
       layers.push({ name: "Gemini LLM filter", ran: false, note: "call failed (fail closed)" });
     }
   } else {
-    layers.push({ name: "LLM filter", ran: false, note: `LLM filter not configured (GOOGLE_CLOUD_PROJECT): rules only; fit with the licensed use (${category}) not checked` });
+    layers.push({ name: "LLM filter", ran: false, note: `LLM filter not configured (GEMINI_API_KEY): rules only; fit with the licensed use (${category}) not checked` });
   }
   return { allowed: reasons.length === 0, reasons, layers };
 }

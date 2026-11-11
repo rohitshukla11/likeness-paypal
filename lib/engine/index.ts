@@ -5,9 +5,22 @@ import { authorizeOrder, captureAuthorization, createVaultOrder, refundCapture, 
 import { createPayout } from "../paypal/payouts";
 import { signPayload } from "../receipts";
 import { stubCompliance } from "./compliance";
-import { providerFromEnv } from "./providers";
+import { AiProvider } from "../ai/provider";
+import { DrizzleQuota } from "../ai/quota-store";
+import { demoClip, referencePhotos } from "../ai/reference";
+import { StubProvider, type RenderProvider } from "./providers";
 import type { EngineDeps, PayPalPort } from "./render-and-pay";
 import { DrizzleStore } from "./store";
+
+/**
+ * RENDER_PROVIDER=gemini: Gemini images (and, once enabled, Omni Flash video) on the Gemini API within the AI
+ * caps; anything else, or unset: the StubProvider (pre-made demo images, no cost).
+ */
+export function providerFromEnv(env: NodeJS.ProcessEnv = process.env): RenderProvider {
+  const stub = new StubProvider();
+  if (env.RENDER_PROVIDER !== "gemini") return stub;
+  return new AiProvider({ quota: new DrizzleQuota(), stub, references: (i) => referencePhotos(i.creatorPhotoRef), demoClip });
+}
 
 export const livePayPal: PayPalPort = { createVaultOrder, authorizeOrder, captureAuthorization, voidAuthorization, refundCapture, createPayout };
 
