@@ -3,7 +3,8 @@
 ## For judges
 
 **Live (PayPal sandbox):** https://likeness-r2t7.onrender.com. No sign-up: each visitor gets a private demo workspace,
-with a creator (Rohit) who has already approved one licence for the demo brand.
+with a creator (Rohit) who has already approved one licence for the demo brand. For a fresh workspace, open the site
+in a private or incognito window.
 
 New workspaces also get two **synthetic creators**, so the Brand page's **Creators** section (a search box with a Search button, filters, and the results right
 there) has something to filter. Rohit's card shows his real photo; the synthetic creators show their AI-generated faces:
@@ -17,7 +18,9 @@ there) has something to filter. Rohit's card shows his real photo; the synthetic
 They are labelled the same way wherever they appear. They have no PayPal accounts of their own: their payouts go to
 the same sandbox account as Rohit's (`PAYPAL_SANDBOX_CREATOR_EMAIL`), noted as "Synthetic creator: sandbox payout
 account shared with the demo" in the ledger and on the receipt. Their reference portraits are AI-generated faces of fictional
-adults (`pnpm portraits:synthetic`, gated), sealed into the database like Rohit's photo.
+adults (`pnpm portraits:synthetic`, gated), sealed into the database like Rohit's photo. Theo allows images only: a
+video with Theo is refused before any PayPal call ("This creator allows images only, not video: I didn't charge your
+PayPal.").
 
 **The 3-minute path**
 
@@ -69,8 +72,10 @@ then adapted in a separate commit.
 
 **Caps and fallbacks**
 
-- **AI images:** `gemini-nano-banana-2.1`, at most 10 a day across the live demo and 3 per workspace.
-- **AI videos:** Gemini Omni Flash, from a generated ad image, at most 3 ever.
+- **AI images:** `gemini-nano-banana-2.1` with likeness-eth's pipeline (`RENDER_PROVIDER=eth`: its prompt rules and a
+  face check, regenerated once on a mismatch), at most 10 a day across the live demo and 3 per workspace (a
+  regeneration takes one more).
+- **AI videos:** 8 s at 16:9, Gemini Omni Flash animating the video's own opening still, at most 5 in total.
 - **Over a cap:** a labelled pre-made demo image or the saved demo clip stands in, and no AI call is made.
 - **Agent:** 20 turns per workspace and a daily cap across the demo.
 - **Never charged:** refused prompts, licences or mandates are never charged. A render that fails its vision check
@@ -115,8 +120,8 @@ Then the creator is paid 90% through PayPal Payouts when the brand accepts the a
 
 | What | Model (Gemini API) | Caps | Over the cap |
 |---|---|---|---|
-| Image ads, from the creator's reference photo | `gemini-nano-banana-2.1`, 1K (about $0.034 per image) | `RENDER_CAP_DAILY` per UTC day (10 on the live demo, 30 by default), `RENDER_CAP_PER_WORKSPACE`=3 | the labelled demo image stands in, and no AI call is made |
-| Video ads, priced at 3× an image, starting from one of the brand's generated ad images (its first frame, never the raw photo) | `gemini-omni-1.2-flash`, 4 s at 720p, task `image_to_video` (about $0.28) | `VIDEO_CAP_TOTAL`=5 in total on the live demo (3 by default) | the saved clip `private/demo-video.mp4` plays, labelled "demo render" |
+| Image ads, from the creator's reference photo (likeness-eth's prompt rules and face check on the live demo) | `gemini-nano-banana-2.1`, 1K (about $0.048 per image, one more on a regeneration) | `RENDER_CAP_DAILY` per UTC day (10 on the live demo, 30 by default), `RENDER_CAP_PER_WORKSPACE`=3 | the labelled demo image stands in, and no AI call is made |
+| Video ads, priced at the licence's video multiplier (3× for Rohit, none for Theo): on the live demo (`eth`) the video makes its own 16:9 opening still from the reference photo; with `gemini` it starts from one of the brand's generated ad images | `gemini-omni-1.2-flash`, 8 s at 720p and 16:9 on the live demo (`VIDEO_SECONDS`), task `image_to_video` (about $0.61 with its still; 4 s with `gemini`, about $0.28) | `VIDEO_CAP_TOTAL`=5 in total on the live demo (3 by default) | the saved clip `private/demo-video.mp4` plays, labelled "demo render" |
 | Prompt safety filter, run before every AI render | `gemini-3.5-flash-lite`, plus local banned-use rules; fails closed | – | – |
 
 - **Video model:** video uses **Gemini Omni Flash**, not Veo. Veo's previews on the Gemini API were shut down on
@@ -137,8 +142,8 @@ Then the creator is paid 90% through PayPal Payouts when the brand accepts the a
 
 ### The likeness-eth pipeline (`RENDER_PROVIDER=eth`)
 
-likeness-eth's way of making ads, on the same Gemini API models (`lib/ai/eth.ts`). `RENDER_PROVIDER=gemini` switches
-back; the live deploy stays on `gemini` until it's chosen.
+likeness-eth's way of making ads, on the same Gemini API models (`lib/ai/eth.ts`). The live demo uses it
+(`render.yaml`); `RENDER_PROVIDER=gemini` switches back.
 
 - **Prompts:** likeness-eth's templates (`lib/ai/eth-prompts.ts`): the brief, then the rules that keep the creator
   faithful, including never copying the reference photo's clothing, accessories or straight-on pose. The Studio shows
@@ -151,7 +156,8 @@ back; the live deploy stays on `gemini` until it's chosen.
   (8) at 16:9. likeness-eth used Veo 3.1 Lite on Vertex AI; Veo isn't on the Gemini API, so Omni Flash stands in.
 - **Label:** images carry "AI-generated · licensed likeness" in their pixels; every video player shows it as a fixed
   overlay (no ffmpeg re-encoding), and it is in the receipt and the content credential.
-- **Cost (Gemini API list prices):** about $0.035 per image (one more on a regeneration), about $0.59 per 8 s video.
+- **Cost (Gemini API, measured 2026-11-11 from reported tokens):** about $0.048 per image (one more on a
+  regeneration), about $0.61 per 8 s video with its opening still.
 - **Unchanged:** the prompt check before payment, authorize, render, vision compliance, capture or void; the caps and
   the demo stand-ins over them; C2PA; sealed reference photos from Neon; per-creator rules (Theo: images only).
 

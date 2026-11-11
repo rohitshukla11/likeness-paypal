@@ -15,6 +15,8 @@ import { onboardingCreator } from "@/lib/onboarding/session";
 import { OnboardFlow } from "./flow";
 
 export default function OnboardPage(props: PageProps<"/creator/onboard">) {
+  // Off (the live demo): a real HTTP 404, decided before anything streams (inside Suspense it could only be a 200).
+  if (!onboardingEnabled()) notFound();
   return (
     <Suspense fallback={<p className="px-4 py-8 text-sm text-grey">Loading…</p>}>
       <Onboard {...props} />

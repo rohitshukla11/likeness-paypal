@@ -54,7 +54,7 @@ services:
         value: "30"
       # AI (Gemini API) and its caps
       - key: RENDER_PROVIDER
-        value: gemini
+        value: eth
       - key: GEMINI_API_KEY
         sync: false
       - key: RENDER_CAP_DAILY
@@ -64,7 +64,7 @@ services:
       - key: VIDEO_CAP_TOTAL
         value: "5"
       - key: VIDEO_SECONDS
-        value: "4"
+        value: "8"
       - key: VIDEO_TIMEOUT_MS
         value: "300000"
       # Agents (brand chat, creator licence review): Gemini text calls, capped
