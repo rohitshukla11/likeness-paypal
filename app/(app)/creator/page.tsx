@@ -2,6 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { onboardingEnabled } from "@/lib/onboarding/google";
+import { LicenceReview } from "@/components/agent/LicenceReview";
+import { geminiConfigured } from "@/lib/ai/gemini";
 import { AppPage, btnClass, Card, CreatorFace, Initial, StatCard, StatusPill } from "@/components/ds";
 import { CREATOR_LABEL, PayPalId, renderPill, usd, when } from "@/components/dashboard/shared";
 import { chipClass, Field, fmtDay, inputClass, StatusBadge } from "@/components/ui";
@@ -119,6 +121,7 @@ async function Creator({ searchParams }: PageProps<"/creator">) {
                       <button className={btnClass("outline", "cursor-pointer")}>Decline</button>
                     </form>
                   </span>
+                  {geminiConfigured() && <LicenceReview licenceId={r.id} />}
                 </div>
               ))
             )}

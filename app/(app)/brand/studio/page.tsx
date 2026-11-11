@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
+import { BrandAgent } from "@/components/agent/BrandAgent";
 import { AppPage, btnClass, Card, StatCard } from "@/components/ds";
+import { geminiConfigured } from "@/lib/ai/gemini";
 import { RenderCard } from "@/components/dashboard/RenderCard";
 import { usd } from "@/components/dashboard/shared";
 import { chipClass, Field, inputClass } from "@/components/ui";
@@ -41,6 +43,7 @@ async function Studio({ searchParams }: PageProps<"/brand/studio">) {
       }
     >
       <Notice ok={q.ok} error={q.error} />
+      {geminiConfigured() && <BrandAgent />}
 
       {m && (
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
