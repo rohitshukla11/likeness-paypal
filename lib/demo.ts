@@ -3,10 +3,13 @@ import "server-only";
  * Demo workspaces: each visitor gets an isolated set of rows (a creator "Rohit" with the demo portrait, and a demo
  * brand), so judges never see each other's licences or renders. "Reset demo" starts a new workspace; the old one is
  * left in place, nothing is deleted.
+ * For a 3-minute demo each workspace also starts with a mandate (default limits, waiting for a wallet: "Use demo
+ * wallet" or "Save PayPal wallet" activates it) and one licence Rohit has already approved (advertising and social,
+ * 10 renders, 30 days). Requesting and approving more licences works as usual.
  */
 import { and, desc, eq, isNotNull } from "drizzle-orm";
 import { db } from "./db";
-import { brands, creators, workspaces } from "./db/schema";
+import { BANNED_USES, brands, creators, licences, mandates, workspaces } from "./db/schema";
 import { newId } from "./errors";
 
 export interface Workspace {
@@ -15,7 +18,7 @@ export interface Workspace {
   brandId: string;
 }
 
-export async function createWorkspace(opts: { creatorEmail?: string | null; brandName?: string } = {}): Promise<Workspace> {
+export async function createWorkspace(opts: { creatorEmail?: string | null; brandName?: string; seedDemo?: boolean } = {}): Promise<Workspace> {
   const id = newId("ws");
   const creatorId = newId("cre");
   const brandId = newId("brd");
@@ -34,6 +37,34 @@ export async function createWorkspace(opts: { creatorEmail?: string | null; bran
       maxDays: 30,
     });
     await tx.insert(brands).values({ id: brandId, workspaceId: id, name: opts.brandName ?? "Demo Brand Co." });
+    if (opts.seedDemo !== false) {
+      const now = Date.now();
+      await tx.insert(mandates).values({
+        id: newId("man"),
+        brandId,
+        maxPerRenderCents: 1000,
+        dailyCapCents: 2000,
+        totalBudgetCents: 5000,
+        stepUpThresholdCents: 800,
+        expiresAt: new Date(now + 30 * 86_400_000),
+        status: "pending_wallet",
+      });
+      await tx.insert(licences).values({
+        id: newId("lic"),
+        creatorId,
+        brandId,
+        pricePerRenderCents: 200,
+        videoMultiplier: 3,
+        allowedUses: ["advertising", "social"],
+        bannedUses: [...BANNED_USES],
+        renderCap: 10,
+        days: 30,
+        brief: "Demo: café and lifestyle ads (pre-approved by the demo creator)",
+        expiresAt: new Date(now + 30 * 86_400_000),
+        status: "active",
+        approvedAt: new Date(now),
+      });
+    }
   });
   return { id, creatorId, brandId };
 }

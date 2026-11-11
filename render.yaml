@@ -67,6 +67,13 @@ services:
         value: "4"
       - key: VIDEO_TIMEOUT_MS
         value: "300000"
+      # Agents (brand chat, creator licence review): Gemini text calls, capped
+      - key: AGENT_MODEL
+        value: gemini-3.5-flash-lite
+      - key: AGENT_TURNS_PER_WORKSPACE
+        value: "20"
+      - key: AGENT_TURNS_DAILY
+        value: "400"
       # Content credentials (test certificate)
       - key: C2PA_CERT_PEM
         sync: false

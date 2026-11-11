@@ -45,6 +45,8 @@ Neon Postgres. Nothing is stored on Render's disk, which is ephemeral.
 | `RENDER_CAP_DAILY`, `RENDER_CAP_PER_WORKSPACE`, `VIDEO_CAP_TOTAL` | `30`, `3`, `3` | atomic counters in Neon (`ai_quota`), shared with local runs |
 | `VIDEO_SECONDS`, `VIDEO_TIMEOUT_MS` | `4`, `300000` | |
 | `C2PA_CERT_PEM`, `C2PA_KEY_PEM` | secret | the test chain from `private/c2pa`, newlines escaped as `\n` (see below); without them renders carry no manifest |
+| `AGENT_MODEL` | `gemini-3.5-flash-lite` | the brand and creator agents |
+| `AGENT_TURNS_PER_WORKSPACE`, `AGENT_TURNS_DAILY` | `20`, `400` | agent turns per demo workspace, and across the demo per UTC day (atomic counters in `ai_quota`) |
 | `FEATURE_CREATOR_ONBOARDING` | `false` | onboarding stays off: no Google OAuth client, no face models on the server |
 
 To get the C2PA PEMs as one line each (they print key material, so only paste them into Render's secret field):

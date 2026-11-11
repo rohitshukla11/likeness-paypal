@@ -42,7 +42,7 @@ export async function runEngineE2E(vaultId: string, label = "e2e"): Promise<E2ER
   if (paypalConfig().env !== "sandbox") throw new Error("the e2e runs only with PAYPAL_ENV=sandbox");
   const run = `${label}-${newId("x").slice(2, 10)}`;
   const token = await getPaymentToken(vaultId);
-  const ws = await createWorkspace({ brandName: `E2E brand ${run}` });
+  const ws = await createWorkspace({ brandName: `E2E brand ${run}`, seedDemo: false });
   await db()
     .insert(paypalVaultTokens)
     .values({ paymentTokenId: token.id, setupTokenId: "reused-sandbox-wallet", customerId: token.customer?.id ?? null, payerEmail: token.payment_source?.paypal?.email_address ?? null })

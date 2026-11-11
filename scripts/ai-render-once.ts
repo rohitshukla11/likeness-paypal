@@ -154,7 +154,7 @@ async function main() {
     licenceId = source!.licenceId;
     mandateId = source!.mandateId;
   } else {
-  const ws = await createWorkspace({ brandName: "AI check brand" });
+  const ws = await createWorkspace({ brandName: "AI check brand", seedDemo: false });
   const mid = newId("man");
   await db().insert(mandates).values({ id: mid, brandId: ws.brandId, maxPerRenderCents: 1000, dailyCapCents: 3000, totalBudgetCents: 6000, stepUpThresholdCents: 1000, expiresAt: new Date(Date.now() + 30 * 864e5), status: "pending_wallet" });
   await attachSharedDemoWallet(ws.brandId);

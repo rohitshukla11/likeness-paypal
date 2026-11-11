@@ -1,5 +1,81 @@
 # Likeness × PayPal
 
+## For judges
+
+**Live (PayPal sandbox):** https://likeness-r2t7.onrender.com. No sign-up: each visitor gets a private demo workspace,
+with a creator (Rohit) who has already approved one licence for the demo brand.
+
+**The 3-minute path**
+
+1. Open the live URL and choose **Continue as Brand**.
+2. On the Brand page, save a PayPal wallet in one of two ways. Either is a sandbox PayPal Vault payment token, saved
+   once with no purchase, and it activates your mandate (spending limits).
+   - **Use demo wallet** (one click): attaches a shared sandbox buyer wallet.
+   - **Save PayPal wallet** (PayPal JS SDK v6): log in with the **Judge buyer** sandbox account below.
+3. Open **Studio** and ask the **Brand agent**: *"Make a 9:16 café ad with Rohit"*. Each step shows live:
+   1. prompt check
+   2. licence and mandate check
+   3. authorize on your saved wallet
+   4. render
+   5. compliance check
+   6. capture
+4. On the new render card, press **Accept**. The creator is paid 90% through PayPal Payouts, and the receipt is
+   signed.
+5. Switch to **Creator**. The payout and its PayPal ids are in Earnings. **Revoke** the licence there.
+6. Back in **Studio**, ask the agent *"Make another one"*. The answer is *"Licence revoked: I didn't charge your
+   PayPal."*, with zero PayPal calls.
+7. Optional:
+   - Ask *"What did I spend this week?"*: the agent answers from the app's records and PayPal's
+     `list_transactions`.
+   - Check any receipt at **Verify**.
+
+**Sandbox logins**
+
+| Account | Email | Password |
+|---|---|---|
+| Judge buyer (sandbox personal: use it to save a wallet) | *(added by the author)* | *(added by the author)* |
+
+**What's new and what's reused:** everything was built for this hackathon except the files listed in
+[docs/HACKATHON.md](docs/HACKATHON.md). Those were copied from the author's earlier projects in a verbatim commit,
+then adapted in a separate commit.
+
+**PayPal APIs used**
+
+| API | Used for |
+|---|---|
+| OAuth 2.0 (client credentials, plus a browser-safe client token) | every server call, and the JS SDK |
+| JS SDK v6, `VAULT_WITHOUT_PAYMENT` | the brand saves its PayPal wallet without a purchase |
+| Vault v3: setup tokens, payment tokens | the saved wallet (`vault_id`), `UNSCHEDULED_POSTPAID` |
+| Orders v2 | one order per ad on the `vault_id`, intent AUTHORIZE |
+| Payments v2: capture, void, refund | capture after render and compliance; void if either fails; refund if the brand rejects |
+| Payouts v1 | 90% to the creator, `sender_batch_id` set to the render id |
+| Webhooks: verify-webhook-signature | captures, refunds, payouts and vault events, verified before they're acted on |
+| Agent Toolkit (`@paypal/agent-toolkit`): `list_transactions`, `get_order` | the brand agent's PayPal read tools |
+| Transaction Search (reporting), through the toolkit | "What did I spend?" |
+
+**Caps and fallbacks**
+
+- **AI images:** `gemini-nano-banana-2.1`, at most 30 a day across the demo and 3 per workspace.
+- **AI videos:** Gemini Omni Flash, from a generated ad image, at most 3 ever.
+- **Over a cap:** a labelled pre-made demo image or the saved demo clip stands in, and no AI call is made.
+- **Agent:** 20 turns per workspace and a daily cap across the demo.
+- **Never charged:** refused prompts, licences or mandates are never charged. A render that fails its vision check
+  has its authorization voided.
+
+**Run it locally**
+
+```sh
+pnpm install
+cp .env.example .env.local   # PayPal sandbox app, DATABASE_URL (Neon), RECEIPT_SIGNING_KEY, PHOTO_KEK, GEMINI_API_KEY
+pnpm db:migrate
+pnpm dev                     # http://localhost:3000
+pnpm test && pnpm e2e:engine # unit tests; the engine against the PayPal sandbox
+```
+
+---
+
+## About
+
 License your face to AI ads, paid with PayPal. A brand saves its PayPal wallet once. Each ad the creator has licensed is:
 
 1. authorized on that wallet
@@ -8,8 +84,6 @@ License your face to AI ads, paid with PayPal. A brand saves its PayPal wallet o
 
 Then the creator is paid 90% through PayPal Payouts when the brand accepts the ad. Built for the PayPal AI Hackathon
 (November 2026).
-
-**Live (PayPal sandbox):** https://likeness-r2t7.onrender.com
 
 **Status:**
 

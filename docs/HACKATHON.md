@@ -16,6 +16,7 @@ Everything in this repository is new work unless it is listed under "Reused code
   the Creator page and Verify. The demo images in `public/demo/` were drawn for this project as SVG.
 - `tests/` (unit tests) and `scripts/engine-e2e.ts` (the engine against the PayPal sandbox).
 - `docs/DEPLOY.md`: research on Render Workflows.
+- Agents and compliance (new, not reused): the brand agent (`lib/agent/brand.ts`, a Gemini tool-calling loop with the PayPal Agent Toolkit's `list_transactions` and `get_order` and this app's own tools, streaming every engine step), the creator agent's licence review (`lib/agent/creator.ts`), the prompt check before payment (`lib/ai/precheck.ts`) and the Gemini vision check after render (`lib/ai/vision.ts`).
 
 ## Reused code
 
