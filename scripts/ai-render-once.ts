@@ -26,12 +26,13 @@ import { geminiConfigured, geminiModels, genai, type GenAiLike } from "../lib/ai
 import { AiProvider } from "../lib/ai/provider";
 import { EthProvider, ethVideoSeconds } from "../lib/ai/eth";
 import { fullPrompt, promptsFor } from "../lib/ai/eth-prompts";
-import { aiCaps, MemoryQuota } from "../lib/ai/quota";
+import { aiCaps, imageKeys, videoKeys } from "../lib/ai/quota";
+import { DrizzleQuota } from "../lib/ai/quota-store";
 import { adImage, referencePath, referencePhotos } from "../lib/ai/reference";
 import { estimatedVideoCostUsd, imageToVideo, videoSeconds } from "../lib/ai/render-video";
 import { closeDb, db } from "../lib/db";
 import { getBlob, renderKey } from "../lib/blobs";
-import { mandates, receipts, renders } from "../lib/db/schema";
+import { aiQuota, mandates, receipts, renders } from "../lib/db/schema";
 import { createWorkspace } from "../lib/demo";
 import { engineDeps } from "../lib/engine";
 import { StubProvider } from "../lib/engine/providers";
@@ -135,7 +136,7 @@ async function main() {
   if (eth) console.log(`\nExact prompt sent (likeness-eth templates):\n${fullPrompt(kind, promptsFor(kind, PROMPT[kind]))}\n`);
   line("PayPal (sandbox)", `authorize ${kind === "video" ? "$6.00 (3 × $2.00)" : "$2.00"} on the demo wallet, capture, brand accepts, payout 90%`);
   line("estimated cost", `about $${estimate.toFixed(3)} (Gemini API list prices, 2026-11)`);
-  line("caps", `this run uses its own counter; the app's caps stay ${JSON.stringify(aiCaps())}`);
+  line("caps", `this run reserves from the shared caps in Postgres, like the app: ${await slotsLeft(null)}`);
   if (!confirm) {
     console.log("\nNo Gemini call made. Re-run with --confirm to make exactly one render.");
     return;
@@ -161,7 +162,7 @@ async function main() {
     : undefined;
   const provider = eth
     ? new EthProvider({
-        quota: new MemoryQuota(),
+        quota: new DrizzleQuota(),
         stub: new StubProvider(),
         references: (i) => referencePhotos(i.creatorPhotoRef),
         client,
@@ -169,7 +170,7 @@ async function main() {
         credential,
       })
     : new AiProvider({
-    quota: new MemoryQuota(),
+    quota: new DrizzleQuota(),
     stub: new StubProvider(),
     references: (i) => referencePhotos(i.creatorPhotoRef),
     client,
@@ -194,11 +195,13 @@ async function main() {
 
   let licenceId: string;
   let mandateId: string;
+  let runWorkspace: string | null = null;
   if (kind === "video" && !eth) {
     licenceId = source!.licenceId;
     mandateId = source!.mandateId;
   } else {
   const ws = await createWorkspace({ brandName: "AI check brand", seedDemo: false });
+  runWorkspace = ws.id;
   const mid = newId("man");
   await db().insert(mandates).values({ id: mid, brandId: ws.brandId, maxPerRenderCents: 1000, dailyCapCents: 3000, totalBudgetCents: 6000, stepUpThresholdCents: 1000, expiresAt: new Date(Date.now() + 30 * 864e5), status: "pending_wallet" });
   await attachSharedDemoWallet(ws.brandId);
@@ -233,6 +236,20 @@ async function main() {
     line(`usage ${u.model}`, `${u.promptTokens ?? "?"} in, ${u.outputTokens ?? "?"} out${u.thoughtTokens ? ` + ${u.thoughtTokens} thinking` : ""} → $${Number.isFinite(c) ? c.toFixed(4) : "?"}`);
   }
   line("actual cost", `$${total.toFixed(4)} (from Gemini's reported tokens at list prices; the billing console is authoritative)`);
+  line("slots left", await slotsLeft(runWorkspace));
+}
+
+/** Slots left now: today's daily image cap, a workspace's image cap (if given), the video total. */
+async function slotsLeft(workspaceId: string | null) {
+  const caps = aiCaps();
+  const [day, ws] = imageKeys(workspaceId, new Date(), caps);
+  const [video] = videoKeys(caps);
+  const used = async (key: string) => (await db().select({ count: aiQuota.count }).from(aiQuota).where(eq(aiQuota.key, key)))[0]?.count ?? 0;
+  return [
+    `daily images ${caps.imageDaily - (await used(day.key))} of ${caps.imageDaily} left (${day.key})`,
+    ...(workspaceId ? [`this workspace ${caps.imagePerWorkspace - (await used(ws.key))} of ${caps.imagePerWorkspace} left`] : []),
+    `videos ${caps.videoTotal - (await used(video.key))} of ${caps.videoTotal} left`,
+  ].join("; ");
 }
 
 main()

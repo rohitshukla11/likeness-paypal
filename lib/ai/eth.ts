@@ -26,7 +26,7 @@ import { generateContent, geminiConfigured, geminiModels, type GenAiLike } from 
 import { labelRender } from "./label";
 import type { Reference } from "./provider";
 import { STAND_IN, standInNote } from "../engine/stand-in";
-import { aiCaps, imageCapReason, imageKeys, videoKeys, type AiCaps, type Quota } from "./quota";
+import { aiCaps, reserveAi, type AiCaps, type Quota } from "./quota";
 
 export const ETH_VIDEO_ASPECT = "16:9" as const;
 const MAX_REFERENCES = 3;
@@ -135,7 +135,7 @@ export class EthProvider implements RenderProvider {
     const faceCheck = this.deps.faceCheck ?? geminiFaceCheck(this.deps.client);
     let face: FaceResult | null = null;
     for (let attempt = 0; attempt < 2; attempt++) {
-      if (attempt === 1 && !(await this.deps.quota.reserve(imageKeys(input.workspaceId, this.now(), this.caps)))) {
+      if (attempt === 1 && !(await reserveAi(this.deps.quota, "regeneration", { workspaceId: input.workspaceId, now: this.now() }, this.caps)).ok) {
         throw new Error(`the face didn't match the creator (${face?.reason}), and the AI image cap is reached, so it wasn't regenerated`);
       }
       const still = await ethImage(text, refs, aspect, this.deps.client);
@@ -154,8 +154,8 @@ export class EthProvider implements RenderProvider {
     const refs = await this.deps.references(input);
     if (!refs.length) return this.standIn(input, standInNote(STAND_IN.noReference));
     const caps = this.caps;
-    const keys = imageKeys(input.workspaceId, this.now(), caps);
-    if (!(await this.deps.quota.reserve(keys))) return this.standIn(input, standInNote(await imageCapReason(this.deps.quota, keys, caps)));
+    const slot = await reserveAi(this.deps.quota, "image", { workspaceId: input.workspaceId, now: this.now() }, caps);
+    if (!slot.ok) return this.standIn(input, standInNote(slot.reason));
     const aspect = input.aspect ?? "1:1";
     const still = await this.checkedStill(input, refs, promptsFor("image", input.prompt, aspect).still, aspect);
     const labelled = new Uint8Array(await labelRender(still.bytes));
@@ -174,7 +174,8 @@ export class EthProvider implements RenderProvider {
     const refs = await this.deps.references(input);
     if (!refs.length) return clip(STAND_IN.noReference);
     const caps = this.caps;
-    if (!(await this.deps.quota.reserve(videoKeys(caps)))) return clip(STAND_IN.videoTotal(caps.videoTotal));
+    const slot = await reserveAi(this.deps.quota, "video", { workspaceId: input.workspaceId, now: this.now() }, caps);
+    if (!slot.ok) return clip(slot.reason);
     // Its own opening still, from the reference photos (covered by the video's price and its video slot).
     const p = promptsFor("video", input.prompt);
     const still = await this.checkedStill(input, refs, p.still, ETH_VIDEO_ASPECT);

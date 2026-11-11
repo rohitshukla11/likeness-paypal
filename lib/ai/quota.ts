@@ -57,3 +57,19 @@ export async function imageCapReason(quota: Quota, keys: QuotaKey[], caps: AiCap
   const daily = keys[0]?.key;
   return full.length && !full.includes(daily) ? STAND_IN.imageWorkspace(caps.imagePerWorkspace) : STAND_IN.imageDaily(caps.imageDaily);
 }
+
+/**
+ * What a billed AI call reserves: an image (or a face-check regeneration of any still) counts against the daily and
+ * the per-workspace image caps; a video against the video total (its own opening still is part of the video).
+ */
+export type AiSlot = "image" | "regeneration" | "video";
+
+/**
+ * The one place a billed AI call reserves its caps: every key it counts against, in one all-or-nothing reservation
+ * (Quota.reserve), so concurrent renders can't overshoot a cap. Refused: why, in plain words.
+ */
+export async function reserveAi(quota: Quota, slot: AiSlot, ctx: { workspaceId: string | null; now: Date }, caps: AiCaps): Promise<{ ok: true } | { ok: false; reason: string }> {
+  const keys = slot === "video" ? videoKeys(caps) : imageKeys(ctx.workspaceId, ctx.now, caps);
+  if (await quota.reserve(keys)) return { ok: true };
+  return { ok: false, reason: slot === "video" ? STAND_IN.videoTotal(caps.videoTotal) : await imageCapReason(quota, keys, caps) };
+}

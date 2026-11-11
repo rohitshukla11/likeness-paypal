@@ -1,5 +1,10 @@
 import "server-only";
-/** The AI caps on Postgres: one transaction, one conditional UPDATE per key (count < limit), all or nothing. */
+/**
+ * The AI caps on Postgres: one transaction, one conditional UPDATE per key (count < limit), all or nothing. Safe under
+ * concurrency: each UPDATE locks its row and re-checks count < limit after any concurrent increment commits (READ
+ * COMMITTED), so a cap is never overshot; a refused key rolls back the keys already taken. Keys are taken in sorted
+ * order, so two reservations never lock the same rows in opposite orders (no deadlock).
+ */
 import { and, eq, inArray, lt, sql } from "drizzle-orm";
 import { db } from "../db";
 import { aiQuota } from "../db/schema";
@@ -11,7 +16,7 @@ export class DrizzleQuota implements Quota {
   async reserve(keys: QuotaKey[]): Promise<boolean> {
     try {
       await db().transaction(async (tx) => {
-        for (const k of keys) {
+        for (const k of [...keys].sort((a, b) => a.key.localeCompare(b.key))) {
           await tx.insert(aiQuota).values({ key: k.key, count: 0 }).onConflictDoNothing();
           const took = await tx
             .update(aiQuota)
