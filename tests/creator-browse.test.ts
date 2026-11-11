@@ -21,7 +21,7 @@ describe("seeded personas", () => {
     assert.deepEqual(PERSONAS.filter((p) => p.synthetic).map((p) => !!p.seededLicence).sort(), [false, true]);
   });
   it("portrait prompts say the face must not resemble any real or famous person", () => {
-    for (const p of PERSONAS.filter((x) => x.synthetic)) assert.match(p.portrait ?? "", /fictional.*must not resemble any real person, celebrity, public figure or famous person/s);
+    for (const p of PERSONAS.filter((x) => x.synthetic)) assert.match(p.portrait ?? "", /fictional.*must not resemble any real person, celebrity, public figure or famous person/);
   });
   it("are found by photo_ref; an onboarded creator is no persona and not synthetic", () => {
     assert.equal(personaOf("/demo/maya.svg")?.name, "Maya Lindqvist");
