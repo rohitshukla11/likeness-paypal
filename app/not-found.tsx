@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { btnClass, NoticePage } from "@/components/ds";
-import { AppHeader } from "@/components/site/AppHeader";
+import { HeaderBar } from "@/components/site/AppHeader";
 
 export const metadata: Metadata = { title: "Not found" };
 
@@ -9,7 +9,7 @@ export default function NotFound() {
   return (
     <div className="flex min-h-screen flex-col bg-paper">
       <div className="bg-ink text-white">
-        <AppHeader />
+        <HeaderBar />
       </div>
       <main id="main" className="flex-1 text-ink">
         <NoticePage
@@ -17,16 +17,16 @@ export default function NotFound() {
           description="Page not found (404)"
           action={
             <>
-              <Link href="/market" className={btnClass("ink")}>
-                Browse creators
-              </Link>
-              <Link href="/" className={btnClass("outline")}>
+              <Link href="/" className={btnClass("ink")}>
                 Home
+              </Link>
+              <Link href="/verify" className={btnClass("outline")}>
+                Verify an ad
               </Link>
             </>
           }
         >
-          That page does not exist. If you followed a link to a creator or a licence, check the address.
+          That page does not exist. If you followed a link to a receipt, check the address, or look the ad up on Verify.
         </NoticePage>
       </main>
     </div>
