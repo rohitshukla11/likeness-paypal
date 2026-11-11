@@ -67,6 +67,12 @@ describe("checkRender", () => {
     assert.deepEqual(checkRender(l, m, ask({ kind: "video", stepUpApproved: true })), { ok: true, amountCents: 600 });
   });
 
+  it("refuses video under an image-only licence (video multiplier 0) and still allows images", () => {
+    const l = licence({ videoMultiplier: 0 }, now);
+    assert.equal(refusal(checkRender(l, mandate({}, now), ask({ kind: "video" }))), "video_not_allowed");
+    assert.equal(checkRender(l, mandate({}, now), ask({ kind: "image" })).ok, true);
+  });
+
   it("checks the licence before the mandate (a revoked licence says so even with no budget left)", () => {
     assert.equal(refusal(checkRender(licence({ revokedAt: now }, now), mandate({ totalBudgetCents: 0 }, now), ask())), "licence_revoked");
   });

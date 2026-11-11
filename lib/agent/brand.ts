@@ -47,6 +47,7 @@ export function plainWords(r: Pick<RenderRow, "status" | "amountCents" | "error"
       no_wallet: "You haven't saved a PayPal wallet yet",
       use_banned: "That use is never allowed",
       use_not_allowed: "The licence doesn't allow that use",
+      video_not_allowed: "This creator allows images only, not video",
       prompt_refused: `The prompt was refused (${r.error ?? "banned use"})`,
       step_up_declined: "You declined it",
     };

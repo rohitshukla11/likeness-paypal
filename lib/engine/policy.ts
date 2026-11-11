@@ -47,6 +47,7 @@ export type RefusalCode =
   | "licence_expired"
   | "use_banned"
   | "use_not_allowed"
+  | "video_not_allowed"
   | "render_cap"
   | "mandate_not_active"
   | "mandate_expired"
@@ -59,7 +60,7 @@ export type Verdict = { ok: true; amountCents: number } | { ok: false; code: Ref
 
 const usd = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 
-/** The price of one render under a licence: video costs videoMultiplier × the per-render price. */
+/** The price of one render under a licence: video costs videoMultiplier × the per-render price (0: image only). */
 export const priceOf = (l: Pick<LicenceView, "pricePerRenderCents" | "videoMultiplier">, kind: RenderAsk["kind"]) => l.pricePerRenderCents * (kind === "video" ? l.videoMultiplier : 1);
 
 /** The creator's 90% and the platform's 10% of a captured render (the creator gets the odd cent's floor). */
@@ -79,6 +80,7 @@ export function checkRender(l: LicenceView, m: MandateView, ask: RenderAsk): Ver
   if (!l.expiresAt || ask.now >= l.expiresAt) return no("licence_expired", "the licence has expired");
   if ((BANNED_USES as readonly string[]).includes(ask.use) || l.bannedUses.includes(ask.use)) return no("use_banned", `${ask.use} use is never allowed`);
   if (!l.allowedUses.includes(ask.use)) return no("use_not_allowed", `the licence doesn't allow ${ask.use} use`);
+  if (ask.kind === "video" && l.videoMultiplier <= 0) return no("video_not_allowed", "the licence is for images only (the creator doesn't allow video)");
   if (l.rendersUsed >= l.renderCap) return no("render_cap", `all ${l.renderCap} renders of this licence are used`);
 
   const amountCents = priceOf(l, ask.kind);
