@@ -136,3 +136,34 @@ describe("vision compliance", () => {
     assert.equal(called, false);
   });
 });
+
+describe("PayPal Agent Toolkit summaries", () => {
+  it("get_order: status, authorization and capture amounts, capture id", async () => {
+    const { summarizeOrder } = await import("../lib/agent/paypal-summary");
+    const order = {
+      id: "5PA12345AB6789012",
+      status: "COMPLETED",
+      purchase_units: [
+        {
+          amount: { value: "2.00", currency_code: "USD" },
+          payments: { authorizations: [{ id: "9MX55012AB3402708", status: "CAPTURED", amount: { value: "2.00", currency_code: "USD" } }], captures: [{ id: "3YH59612AB345580H", status: "COMPLETED", amount: { value: "2.00", currency_code: "USD" } }] },
+        },
+      ],
+    };
+    const s = summarizeOrder(JSON.stringify(order)); // the toolkit may return JSON text
+    assert.deepEqual(s, {
+      orderId: "5PA12345AB6789012",
+      orderStatus: "COMPLETED",
+      orderAmount: "$2.00",
+      authorization: { id: "9MX55012AB3402708", status: "CAPTURED", amount: "$2.00" },
+      capture: { id: "3YH59612AB345580H", status: "COMPLETED", amount: "$2.00" },
+      refund: null,
+    });
+  });
+  it("reporting: one short note only when PayPal shows none of the brand's transactions yet", async () => {
+    const { reportingNote, REPORTING_LAG_NOTE } = await import("../lib/agent/paypal-summary");
+    assert.equal(reportingNote(0), REPORTING_LAG_NOTE);
+    assert.equal(REPORTING_LAG_NOTE, "PayPal's reporting can take a few hours to catch up.");
+    assert.equal(reportingNote(2), null);
+  });
+});

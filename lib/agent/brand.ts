@@ -6,7 +6,7 @@ import "server-only";
  * get_order). Refusals come back in plain words and end the turn ("Licence revoked: I didn't charge your PayPal.").
  * Caps: AGENT_TURNS_PER_WORKSPACE (20) per demo workspace and AGENT_TURNS_DAILY (400) across all visitors.
  */
-import { and, desc, eq, gte, inArray } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNotNull } from "drizzle-orm";
 import type { Quota } from "../ai/quota";
 import { db } from "../db";
 import { creators, licences, mandates, renders } from "../db/schema";
@@ -16,6 +16,7 @@ import type { EngineDeps, RenderRow } from "../engine/render-and-pay";
 import { renderAndPay } from "../engine/render-and-pay";
 import { brandView } from "../queries";
 import { runAgent, type AgentEvent, type AgentTool } from "./llm";
+import { reportingNote, summarizeOrder } from "./paypal-summary";
 import type { GenAiLike } from "../ai/gemini";
 
 const usd = (c: number) => `$${(c / 100).toFixed(2)}`;
@@ -71,7 +72,8 @@ Rules:
 - "Make another one" means: call make_ad again with the previous brief (or a close variation).
 - Never claim money moved unless a tool said so. Quote amounts and statuses from tool results; don't invent ids.
 - After an ad is made, say in one or two sentences what happened (authorized, rendered, checked, captured) and that the brand can Accept (the creator is paid 90% and the receipt is signed) or Reject (refund) in the Studio before the review window closes.
-- For spend questions, call spend_summary, then list_transactions for PayPal's own record. Quote the brand's numbers from spend_summary, and from list_transactions only the "yours" part (how many of the brand's transactions PayPal already shows; sandbox reporting can lag by hours, say so if it shows fewer). Never quote the whole merchant account's figures as the brand's. Two or three sentences.
+- For spend questions, call spend_summary, then list_transactions. Answer with the figures from spend_summary. If list_transactions returns a "note", add that note as one short sentence, word for word, and say nothing else about PayPal's reporting; otherwise you may add how many of the brand's transactions PayPal already shows ("yours"). Never quote the whole merchant account's figures as the brand's. Two sentences at most.
+- For PayPal's record of an ad ("show me PayPal's record for my last ad"), call get_order (leave id empty for the last ad) and summarise in one or two sentences: the order status, the authorization amount and status, the capture amount and status, and the capture id (and the refund, if there is one).
 - For anything about licences, the wallet or limits, call get_status.
 - Keep answers short and plain. No markdown tables.`;
 
@@ -241,6 +243,7 @@ export async function runBrandAgent(input: { workspaceId: string; brandId: strin
         return {
           range: `${start} to ${end}`,
           yours: { foundInPayPal: yours.length, ofYourCapturesAndRefunds: ids.size, net: sum(yours), transactions: yours.slice(-8).map((t) => ({ id: t.transaction_id, status: t.transaction_status, amount: t.transaction_amount?.value, date: t.transaction_initiation_date?.slice(0, 10) })) },
+          ...(ids.size && reportingNote(yours.length) ? { note: reportingNote(yours.length) } : {}),
           wholeDemoMerchantAccount: { count: list.length, note: "all demo brands share one sandbox merchant account" },
         };
       },
@@ -251,14 +254,26 @@ export async function runBrandAgent(input: { workspaceId: string; brandId: strin
     },
     {
       name: "get_order",
-      description: "PayPal Agent Toolkit (read): one PayPal order by id (status, amount, authorizations, captures).",
-      parameters: { type: "object", properties: { id: { type: "string" } }, required: ["id"] },
+      description: "PayPal Agent Toolkit (read): PayPal's own record of one of the brand's ads (its order: status, authorization, capture, refund). Leave id empty for the brand's last ad.",
+      parameters: { type: "object", properties: { id: { type: "string", description: "A PayPal order id of one of the brand's ads (default: the last ad)" } } },
       async run(args) {
-        const raw = await deps.paypalRead.get_order({ id: String(args.id ?? "") });
-        const o = (typeof raw === "string" ? JSON.parse(raw) : raw) as { id?: string; status?: string; purchase_units?: { amount?: { value?: string }; payments?: unknown }[] };
-        return { id: o.id, status: o.status, amount: o.purchase_units?.[0]?.amount?.value, payments: o.purchase_units?.[0]?.payments };
+        const asked = typeof args.id === "string" && args.id.trim() ? args.id.trim() : null;
+        // Only the brand's own orders: the last ad's, or one it names that belongs to one of its renders.
+        const [r] = await db()
+          .select({ orderId: renders.orderId, renderId: renders.id, createdAt: renders.createdAt })
+          .from(renders)
+          .innerJoin(licences, eq(licences.id, renders.licenceId))
+          .where(and(eq(licences.brandId, brandId), asked ? eq(renders.orderId, asked) : isNotNull(renders.orderId)))
+          .orderBy(desc(renders.createdAt))
+          .limit(1);
+        if (!r?.orderId) return { error: asked ? "that order isn't one of your ads" : "you haven't made a paid ad yet" };
+        const o = summarizeOrder(await deps.paypalRead.get_order({ id: r.orderId }));
+        return { ad: { render: r.renderId, made: r.createdAt.toISOString().slice(0, 16).replace("T", " ") + " UTC" }, ...o };
       },
-      summarize: (r) => `order ${(r as { status?: string }).status ?? "?"}`,
+      summarize: (r) => {
+        const x = r as { orderStatus?: string; capture?: { id?: string | null; amount?: string | null } | null; error?: string };
+        return x.error ?? `order ${x.orderStatus ?? "?"}${x.capture ? `, capture ${x.capture.amount ?? "?"} (${x.capture.id})` : ""}`;
+      },
     },
   ];
   const system = `${SYSTEM}\nToday is ${now().toISOString().slice(0, 10)} (UTC).`;
