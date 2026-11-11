@@ -85,17 +85,14 @@ export async function createWorkspace(opts: { creatorEmail?: string | null; bran
 export async function getWorkspace(id: string, preferredCreatorId?: string | null): Promise<Workspace | null> {
   // The creator the visitor chose to play (one of this workspace's live creators), else a live onboarded creator
   // (FEATURE_CREATOR_ONBOARDING), else the seeded one (Rohit, the workspace's first creator).
+  // One round trip: the four lookups run in parallel (every page reads the session first).
   const live = and(eq(creators.workspaceId, id), eq(creators.status, "live"));
-  const [chosen] = preferredCreatorId ? await db().select({ id: creators.id }).from(creators).where(and(live, eq(creators.id, preferredCreatorId))) : [];
-  const [onboarded] = chosen
-    ? [chosen]
-    : await db()
-        .select({ id: creators.id })
-        .from(creators)
-        .where(and(live, isNotNull(creators.googleSub)))
-        .orderBy(desc(creators.createdAt))
-        .limit(1);
-  const [c] = onboarded ? [onboarded] : await db().select({ id: creators.id }).from(creators).where(eq(creators.workspaceId, id)).orderBy(creators.createdAt, creators.id).limit(1);
-  const [b] = await db().select({ id: brands.id }).from(brands).where(eq(brands.workspaceId, id)).limit(1);
+  const [[chosen], [onboarded], [seeded], [b]] = await Promise.all([
+    preferredCreatorId ? db().select({ id: creators.id }).from(creators).where(and(live, eq(creators.id, preferredCreatorId))) : Promise.resolve([]),
+    db().select({ id: creators.id }).from(creators).where(and(live, isNotNull(creators.googleSub))).orderBy(desc(creators.createdAt)).limit(1),
+    db().select({ id: creators.id }).from(creators).where(eq(creators.workspaceId, id)).orderBy(creators.createdAt, creators.id).limit(1),
+    db().select({ id: brands.id }).from(brands).where(eq(brands.workspaceId, id)).limit(1),
+  ]);
+  const c = chosen ?? onboarded ?? seeded;
   return c && b ? { id, creatorId: c.id, brandId: b.id } : null;
 }

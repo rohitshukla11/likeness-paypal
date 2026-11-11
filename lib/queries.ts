@@ -1,6 +1,6 @@
 import "server-only";
 /** Read models for the dashboards (one workspace at a time). */
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "./db";
 import { brands, creators, licences, mandates, paypalVaultTokens, receipts, refusals, renders } from "./db/schema";
@@ -9,10 +9,12 @@ import { toCard } from "./creator-browse";
 import { listFor } from "./licences";
 
 export async function creatorView(creatorId: string) {
-  const [creator] = await db().select().from(creators).where(eq(creators.id, creatorId));
-  const all = await listFor("creatorId", creatorId);
   const b = alias(brands, "b");
-  const ledger = await db()
+  // Two round trips: the creator, their licences and their ledger in parallel, then the workspace's cast.
+  const [[creator], all, ledger] = await Promise.all([
+    db().select().from(creators).where(eq(creators.id, creatorId)),
+    listFor("creatorId", creatorId),
+    db()
     .select({ render: renders, brandName: b.name, receiptId: receipts.id })
     .from(renders)
     .innerJoin(licences, eq(licences.id, renders.licenceId))
@@ -20,25 +22,25 @@ export async function creatorView(creatorId: string) {
     .leftJoin(receipts, eq(receipts.renderId, renders.id))
     .where(and(eq(licences.creatorId, creatorId), inArray(renders.status, ["accepted", "rejected", "in_review", "settling", "refunding"])))
     .orderBy(desc(renders.createdAt))
-    .limit(100);
+    .limit(100),
+  ]);
   const earned = ledger.filter((l) => l.render.status === "accepted").reduce((s, l) => s + l.render.creatorPayoutCents, 0);
   const pending = ledger.filter((l) => ["in_review", "settling"].includes(l.render.status)).reduce((s, l) => s + Math.floor((l.render.amountCents * 90) / 100), 0);
   // The workspace's live creators the visitor can play (the Creator page's switcher), with their waiting requests.
   const cast = creator?.workspaceId
     ? await db()
-        .select({ id: creators.id, name: creators.name, photoRef: creators.photoRef })
+        .select({
+          id: creators.id,
+          name: creators.name,
+          photoRef: creators.photoRef,
+          waiting: sql<number>`(select count(*)::int from ${licences} where ${licences.creatorId} = ${creators.id} and ${licences.status} = 'pending')`,
+        })
         .from(creators)
         .where(and(eq(creators.workspaceId, creator.workspaceId), eq(creators.status, "live")))
         .orderBy(creators.createdAt, creators.id)
     : [];
-  const waiting = cast.length
-    ? await db()
-        .select({ creatorId: licences.creatorId })
-        .from(licences)
-        .where(and(inArray(licences.creatorId, cast.map((x) => x.id)), eq(licences.status, "pending")))
-    : [];
   return {
-    cast: cast.map((x) => ({ ...x, waiting: waiting.filter((w) => w.creatorId === x.id).length })),
+    cast,
     creator,
     requests: all.filter((l) => l.state === "pending"),
     licences: all.filter((l) => l.state !== "pending"),
@@ -50,22 +52,26 @@ export async function creatorView(creatorId: string) {
 
 /** The brand's current mandate (newest) with its wallet, today's committed spend, and the brand's licences. */
 export async function brandView(brandId: string) {
-  const [brand] = await db().select().from(brands).where(eq(brands.id, brandId));
-  const [mandate] = await db().select().from(mandates).where(eq(mandates.brandId, brandId)).orderBy(desc(mandates.createdAt)).limit(1);
-  const [wallet] = brand?.paymentTokenId ? await db().select().from(paypalVaultTokens).where(eq(paypalVaultTokens.paymentTokenId, brand.paymentTokenId)) : [];
+  // Two round trips: the brand, its newest mandate and its licences in parallel, then what depends on them.
+  const [[brand], [mandate], brandLicences] = await Promise.all([
+    db().select().from(brands).where(eq(brands.id, brandId)),
+    db().select().from(mandates).where(eq(mandates.brandId, brandId)).orderBy(desc(mandates.createdAt)).limit(1),
+    listFor("brandId", brandId),
+  ]);
   const ws = brand?.workspaceId;
-  // Live creators only: a draft from creator onboarding isn't offered to brands until it goes live.
-  const workspaceCreators = ws ? await db().select().from(creators).where(and(eq(creators.workspaceId, ws), eq(creators.status, "live"))).orderBy(creators.createdAt, creators.id) : [];
-  const brandLicences = await listFor("brandId", brandId);
-  let spentToday = 0;
-  if (mandate) {
-    const today = await db()
-      .select({ amount: renders.amountCents, createdAt: renders.createdAt })
-      .from(renders)
-      .where(and(eq(renders.mandateId, mandate.id), eq(renders.reserved, true)));
-    const start = utcDayStart(new Date());
-    spentToday = today.filter((r) => r.createdAt >= start).reduce((s, r) => s + r.amount, 0);
-  }
+  const [[wallet], workspaceCreators, today] = await Promise.all([
+    brand?.paymentTokenId ? db().select().from(paypalVaultTokens).where(eq(paypalVaultTokens.paymentTokenId, brand.paymentTokenId)) : Promise.resolve([]),
+    // Live creators only: a draft from creator onboarding isn't offered to brands until it goes live.
+    ws ? db().select().from(creators).where(and(eq(creators.workspaceId, ws), eq(creators.status, "live"))).orderBy(creators.createdAt, creators.id) : Promise.resolve([]),
+    mandate
+      ? db()
+          .select({ amount: renders.amountCents, createdAt: renders.createdAt })
+          .from(renders)
+          .where(and(eq(renders.mandateId, mandate.id), eq(renders.reserved, true)))
+      : Promise.resolve([]),
+  ]);
+  const start = utcDayStart(new Date());
+  const spentToday = today.filter((r) => r.createdAt >= start).reduce((s, r) => s + r.amount, 0);
   // The creator browser's cards (and the agent's list_creators): terms, niche, synthetic label, this brand's licence.
   const cards = workspaceCreators.map((c) => toCard(c, brandLicences));
   return { brand, mandate: mandate ?? null, wallet: wallet ? { ...wallet, kind: (brand.walletKind ?? "own") as "own" | "demo" } : null, creators: workspaceCreators, cards, licences: brandLicences, spentToday };
