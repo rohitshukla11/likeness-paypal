@@ -4,7 +4,7 @@ import { HttpError } from "@/lib/errors";
 import { connectChannel, signIn } from "@/lib/onboarding/creators";
 import { checkIdToken, exchangeCode, oauthClient, onboardingEnabled } from "@/lib/onboarding/google";
 import { ONB_COOKIE } from "@/lib/onboarding/session";
-import { getSession } from "@/lib/session";
+import { getSession, setSession } from "@/lib/session";
 import { appOrigin } from "@/lib/wallet";
 
 /** Google sends the creator back here: check state + PKCE, sign in, connect the YouTube channel (token used once). */
@@ -25,6 +25,8 @@ export async function GET(req: Request) {
     const t = await exchangeCode({ code: url.searchParams.get("code") ?? "", verifier, redirectUri: `${origin}/auth/google/callback`, client });
     const claims = checkIdToken(t.idToken, client.id);
     const creator = await signIn(s.id, { sub: claims.sub, email: claims.email_verified ? (claims.email ?? null) : null, name: claims.name ?? null });
+    // This Google account's creator lives in another workspace: switch this visitor's session there (no row moves).
+    if (creator.workspaceId && creator.workspaceId !== s.id) await setSession(creator.workspaceId, "creator");
     jar.set(ONB_COOKIE, creator.id, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: 30 * 86_400 });
     if (!t.scope.includes("youtube.readonly")) return back("error=Grant+%22See+your+YouTube+account%22+so+we+can+check+your+channel");
     await connectChannel(creator.id, t.accessToken);

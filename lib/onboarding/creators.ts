@@ -31,16 +31,15 @@ export async function getCreator(id: string): Promise<OnboardingCreator | null> 
   return c ?? null;
 }
 
-/** After Google sign-in: this Google account's creator in this workspace (a draft until it goes live). */
+/**
+ * After Google sign-in: this Google account's own creator (one per Google account), a NEW row the first time, in
+ * the visitor's demo workspace, as a draft until it goes live. Never touches another row: if this Google account
+ * already has a creator in another workspace, that creator is returned as it is (the caller switches the visitor's
+ * session to its workspace); it is never moved, and the seeded demo creators (no Google account) are never matched.
+ */
 export async function signIn(workspaceId: string, google: { sub: string; email: string | null; name: string | null }): Promise<OnboardingCreator> {
   const [existing] = await db().select().from(creators).where(eq(creators.googleSub, google.sub));
-  if (existing) {
-    if (existing.workspaceId !== workspaceId) {
-      // The same Google account in another demo workspace: move it here (one creator per Google account).
-      await db().update(creators).set({ workspaceId }).where(eq(creators.id, existing.id));
-    }
-    return { ...existing, workspaceId };
-  }
+  if (existing) return existing;
   const [c] = await db()
     .insert(creators)
     .values({ id: newId("cre"), workspaceId, name: google.name ?? "New creator", googleSub: google.sub, email: google.email, status: "draft", acceptingLicences: false, photoRef: null, payoutPaypalEmail: google.email })

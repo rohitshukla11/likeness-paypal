@@ -11,7 +11,8 @@ export async function onboardingCreator() {
   if (!s) return { session: null, creator: null };
   const id = (await cookies()).get(ONB_COOKIE)?.value;
   const c = id ? await getCreator(id) : null;
-  return { session: s, creator: c && c.workspaceId === s.id ? c : null };
+  // Only a creator made by Google sign-in, in the visitor's own workspace: never a seeded demo creator.
+  return { session: s, creator: c && c.googleSub && c.workspaceId === s.id ? c : null };
 }
 
 /** A data URL or bare base64 JPEG from the browser. */
