@@ -55,7 +55,7 @@ then adapted in a separate commit.
 
 **Caps and fallbacks**
 
-- **AI images:** `gemini-nano-banana-2.1`, at most 30 a day across the demo and 3 per workspace.
+- **AI images:** `gemini-nano-banana-2.1`, at most 10 a day across the live demo and 3 per workspace.
 - **AI videos:** Gemini Omni Flash, from a generated ad image, at most 3 ever.
 - **Over a cap:** a labelled pre-made demo image or the saved demo clip stands in, and no AI call is made.
 - **Agent:** 20 turns per workspace and a daily cap across the demo.
@@ -101,7 +101,7 @@ Then the creator is paid 90% through PayPal Payouts when the brand accepts the a
 
 | What | Model (Gemini API) | Caps | Over the cap |
 |---|---|---|---|
-| Image ads, from the creator's reference photo | `gemini-nano-banana-2.1`, 1K (about $0.034 per image) | `RENDER_CAP_DAILY`=30 per UTC day, `RENDER_CAP_PER_WORKSPACE`=3 | the labelled demo image stands in, and no AI call is made |
+| Image ads, from the creator's reference photo | `gemini-nano-banana-2.1`, 1K (about $0.034 per image) | `RENDER_CAP_DAILY` per UTC day (10 on the live demo, 30 by default), `RENDER_CAP_PER_WORKSPACE`=3 | the labelled demo image stands in, and no AI call is made |
 | Video ads, priced at 3× an image, starting from one of the brand's generated ad images (its first frame, never the raw photo) | `gemini-omni-1.2-flash`, 4 s at 720p, task `image_to_video` (about $0.28) | `VIDEO_CAP_TOTAL`=3 in total | the saved clip `private/demo-video.mp4` plays, labelled "demo render" |
 | Prompt safety filter, run before every AI render | `gemini-3.5-flash-lite`, plus local banned-use rules; fails closed | – | – |
 

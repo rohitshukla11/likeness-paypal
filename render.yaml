@@ -58,7 +58,7 @@ services:
       - key: GEMINI_API_KEY
         sync: false
       - key: RENDER_CAP_DAILY
-        value: "30"
+        value: "10"
       - key: RENDER_CAP_PER_WORKSPACE
         value: "3"
       - key: VIDEO_CAP_TOTAL

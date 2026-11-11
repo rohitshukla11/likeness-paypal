@@ -42,7 +42,7 @@ Neon Postgres. Nothing is stored on Render's disk, which is ephemeral.
 | `SETTLE_LOOP_SECONDS` | `30` | the in-process settle loop (`instrumentation.ts`); `0` turns it off |
 | `RENDER_PROVIDER` | `gemini` | AI renders within the caps; `stub` for no AI calls at all |
 | `GEMINI_API_KEY` | secret | the Gemini API key (new project) |
-| `RENDER_CAP_DAILY`, `RENDER_CAP_PER_WORKSPACE`, `VIDEO_CAP_TOTAL` | `30`, `3`, `3` | atomic counters in Neon (`ai_quota`), shared with local runs |
+| `RENDER_CAP_DAILY`, `RENDER_CAP_PER_WORKSPACE`, `VIDEO_CAP_TOTAL` | `10`, `3`, `3` (the code's default daily cap is 30; the deploy uses 10) | atomic counters in Neon (`ai_quota`), shared with local runs |
 | `VIDEO_SECONDS`, `VIDEO_TIMEOUT_MS` | `4`, `300000` | |
 | `C2PA_CERT_PEM`, `C2PA_KEY_PEM` | secret | the test chain from `private/c2pa`, newlines escaped as `\n` (see below); without them renders carry no manifest |
 | `AGENT_MODEL` | `gemini-3.5-flash-lite` | the brand and creator agents |
