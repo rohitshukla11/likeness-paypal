@@ -23,7 +23,8 @@ export function db(): Db {
     // Keep idle connections for 2 minutes (pg's default is 10 s): a new connection to Neon costs a TLS and auth
     // handshake, seconds when the database is far away, and every page reads several times. Under Neon's 5-minute
     // scale-to-zero, so a kept connection is rarely one the server has closed; if it is, the pool drops it (below).
-    pool = new Pool({ connectionString: url, max: 5, idleTimeoutMillis: 120_000 });
+    // Up to 10 connections: one page load reads in parallel next to its images, the agent and the settle loop.
+    pool = new Pool({ connectionString: url, max: 10, idleTimeoutMillis: 120_000 });
     // An idle connection closed by the server emits "error" on the pool: log it (the pool discards that client)
     // instead of letting an unhandled "error" event stop the process.
     pool.on("error", (e: Error) => console.error(`database: idle connection closed (${e.message})`));
