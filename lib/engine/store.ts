@@ -2,7 +2,8 @@ import "server-only";
 /** The engine's store on Postgres (Drizzle). admit() is the policy transaction: licence and mandate locked FOR UPDATE. */
 import { and, eq, gte, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { db, type Db } from "../db";
-import { creators, licences, mandates, paypalOrders, paypalPayouts, receipts, refusals, renderMedia, renders } from "../db/schema";
+import { putBlob, renderKey } from "../blobs";
+import { creators, licences, mandates, paypalOrders, paypalPayouts, receipts, refusals, renders } from "../db/schema";
 import { newId } from "../errors";
 import type { SignedReceipt } from "../receipts";
 import type { EngineStore, RenderContext, RenderRow, RenderStatus } from "./render-and-pay";
@@ -111,7 +112,7 @@ export class DrizzleStore implements EngineStore {
   }
 
   async saveMedia(renderId: string, m: { bytes: Uint8Array; mime: string; sha256: string }) {
-    await this.database().insert(renderMedia).values({ renderId, mime: m.mime, sha256: m.sha256, bytes: Buffer.from(m.bytes) }).onConflictDoNothing();
+    await putBlob(renderKey(renderId), { kind: "render", mime: m.mime, bytes: m.bytes, sha256: m.sha256 });
   }
 
   async due(now: Date, staleMs: number) {

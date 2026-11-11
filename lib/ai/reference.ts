@@ -24,6 +24,12 @@ export function referencePath(photoRef: string | null): string | null {
 }
 
 export async function referencePhotos(photoRef: string | null, purpose: { renderId?: string; licenceId?: string } = {}): Promise<Reference[]> {
+  if (photoRef === "/demo/rohit.svg") {
+    // Deployed: the sealed upload from `pnpm seed:assets` (blobs). Locally it may only be on disk (below).
+    const { ASSETS, openSealedBlob } = await import("../blobs");
+    const b = await openSealedBlob(ASSETS.reference).catch(() => null);
+    if (b) return [{ bytes: b.bytes, mime: b.mime === "image/png" ? "image/png" : "image/jpeg" }];
+  }
   const onboarded = photoRef?.match(/^\/media\/creator\/(cre_[A-Za-z0-9_-]+)$/);
   if (onboarded) {
     const { openFrames } = await import("../onboarding/vault");
@@ -43,6 +49,9 @@ export async function referencePhotos(photoRef: string | null, purpose: { render
 
 /** The saved real clip played back over the video cap, labelled "demo render". */
 export async function demoClip(): Promise<Uint8Array | null> {
+  const { ASSETS, getBlob } = await import("../blobs");
+  const b = await getBlob(ASSETS.demoClip).catch(() => null);
+  if (b) return b.bytes;
   try {
     return new Uint8Array(await readFile(/*turbopackIgnore: true*/ path.join(PRIVATE(), "demo-video.mp4")));
   } catch {
@@ -58,12 +67,14 @@ export async function adImage(fromRenderId: string | null | undefined, licenceId
   if (!fromRenderId || !licenceId) return null;
   const { and, eq } = await import("drizzle-orm");
   const { db } = await import("../db");
-  const { renderMedia, renders } = await import("../db/schema");
+  const { renders } = await import("../db/schema");
+  const { getBlob, renderKey } = await import("../blobs");
   const [r] = await db()
-    .select({ model: renders.model, kind: renders.kind, mime: renderMedia.mime, bytes: renderMedia.bytes })
+    .select({ model: renders.model, kind: renders.kind })
     .from(renders)
-    .innerJoin(renderMedia, eq(renderMedia.renderId, renders.id))
     .where(and(eq(renders.id, fromRenderId), eq(renders.licenceId, licenceId)));
-  if (!r || r.kind !== "image" || !r.model?.startsWith("gemini") || (r.mime !== "image/jpeg" && r.mime !== "image/png")) return null;
-  return { bytes: new Uint8Array(r.bytes), mime: r.mime };
+  if (!r || r.kind !== "image" || !r.model?.startsWith("gemini")) return null;
+  const b = await getBlob(renderKey(fromRenderId));
+  if (!b || (b.mime !== "image/jpeg" && b.mime !== "image/png")) return null;
+  return { bytes: b.bytes, mime: b.mime };
 }

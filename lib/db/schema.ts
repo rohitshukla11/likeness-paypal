@@ -309,3 +309,35 @@ export const aiQuota = pgTable("ai_quota", {
   count: integer("count").notNull().default(0),
   updatedAt: ts("updated_at").notNull().defaultNow(),
 });
+
+/**
+ * Every stored file, so nothing depends on the server's disk (Render's is ephemeral): generated renders and videos
+ * (render:<render id>), and the deploy's assets (asset:rohit-reference, sealed; asset:demo-video).
+ * A sealed blob's bytes are AES-256-GCM under a data key that is itself wrapped by PHOTO_KEK (wrapped_key).
+ */
+export const blobs = pgTable("blobs", {
+  key: text("key").primaryKey(),
+  /** render | asset */
+  kind: text("kind").notNull(),
+  mime: text("mime").notNull(),
+  /** sha256 of the plaintext bytes */
+  sha256: text("sha256").notNull(),
+  bytes: bytea("bytes").notNull(),
+  wrappedKey: text("wrapped_key"),
+  createdAt: createdAt(),
+});
+
+/** PayPal webhook events, recorded once each (the event id), with whether PayPal verified the signature. */
+export const paypalWebhookEvents = pgTable(
+  "paypal_webhook_events",
+  {
+    id: text("id").primaryKey(),
+    eventType: text("event_type").notNull(),
+    resourceId: text("resource_id"),
+    verified: boolean("verified").notNull(),
+    summary: text("summary"),
+    body: jsonb("body").notNull(),
+    receivedAt: ts("received_at").notNull().defaultNow(),
+  },
+  (t) => [index("paypal_webhook_events_resource_idx").on(t.resourceId)],
+);

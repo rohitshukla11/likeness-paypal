@@ -24,7 +24,8 @@ import { aiCaps, MemoryQuota } from "../lib/ai/quota";
 import { adImage, referencePath, referencePhotos } from "../lib/ai/reference";
 import { estimatedVideoCostUsd, imageToVideo, videoSeconds } from "../lib/ai/render-video";
 import { closeDb, db } from "../lib/db";
-import { mandates, receipts, renderMedia, renders } from "../lib/db/schema";
+import { getBlob, renderKey } from "../lib/blobs";
+import { mandates, receipts, renders } from "../lib/db/schema";
 import { createWorkspace } from "../lib/demo";
 import { engineDeps } from "../lib/engine";
 import { StubProvider } from "../lib/engine/providers";
@@ -172,7 +173,7 @@ async function main() {
     const a = await accept(r.id, deps);
     const [rc] = await db().select().from(receipts).where(eq(receipts.renderId, r.id));
     line("brand accepts", `${a.status}; payout ${short(a.payoutBatchId)} $${(a.creatorPayoutCents / 100).toFixed(2)}; receipt ${short(rc?.id)} ${rc ? (checkReceipt({ canonical: rc.canonicalPayload, signature: rc.signature, keyId: rc.keyId }) ? "signature valid" : "INVALID") : ""}`);
-    const [m] = await db().select().from(renderMedia).where(eq(renderMedia.renderId, r.id));
+    const m = await getBlob(renderKey(r.id));
     if (m) {
       const out = path.join(path.dirname(ref), "out", `${r.id}.${m.mime === "video/mp4" ? "mp4" : "jpg"}`);
       await mkdir(path.dirname(out), { recursive: true });
