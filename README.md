@@ -9,6 +9,8 @@ License your face to AI ads, paid with PayPal. A brand saves its PayPal wallet o
 Then the creator is paid 90% through PayPal Payouts when the brand accepts the ad. Built for the PayPal AI Hackathon
 (November 2026).
 
+**Live (PayPal sandbox):** https://likeness-r2t7.onrender.com
+
 **Status:**
 
 - **Working end to end in the PayPal sandbox:** the render engine, the Brand, Studio, Creator and Verify pages, and
