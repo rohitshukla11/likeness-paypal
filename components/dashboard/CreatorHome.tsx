@@ -11,7 +11,7 @@ import { btnClass, StatusPill } from "@/components/ds";
 import { CREATOR_LABEL, PayPalId, renderPill, usd, when } from "@/components/dashboard/shared";
 import { chipClass, Field, fmtDay, inputClass, StatusBadge } from "@/components/ui";
 import { BANNED_USES, USES } from "@/lib/db/schema";
-import { personaOf } from "@/lib/personas";
+import { personaOf, SHARED_PAYOUT_NOTE } from "@/lib/personas";
 import type { creatorView } from "@/lib/queries";
 import { Banner, CHIP, Empty, FaceTile, Fact, MUTED, OUTLINE, OUTLINE_BAD, Panel, Rule, Stat, StatsRow, SURFACE, SyntheticBadge } from "./kit";
 
@@ -173,6 +173,7 @@ export function CreatorHome({ v, notice, reviewEnabled, onboardingLink }: { v: V
                     <Fact label="You" value={r.status === "accepted" ? usd(r.creatorPayoutCents) : "–"} />
                     <Fact label={r.payoutBatchId ? "Payout" : r.refundId ? "Refund" : "Capture"} value={<PayPalId id={r.payoutBatchId ?? r.refundId ?? r.captureId} />} />
                   </dl>
+                  {r.payoutBatchId && persona?.synthetic && <span className={`text-[12px] ${MUTED}`}>{SHARED_PAYOUT_NOTE}</span>}
                   {receiptId && (
                     <Link href={`/verify/${receiptId}`} className={`${OUTLINE} mt-auto self-start`}>
                       Receipt
@@ -215,6 +216,7 @@ export function CreatorHome({ v, notice, reviewEnabled, onboardingLink }: { v: V
                     <td className="pr-3">
                       <span className={`text-[12px] ${MUTED}`}>{r.payoutBatchId ? "payout " : r.refundId ? "refund " : "capture "}</span>
                       <PayPalId id={r.payoutBatchId ?? r.refundId ?? r.captureId} />
+                      {r.payoutBatchId && persona?.synthetic && <span className={`block text-[11px] ${MUTED}`}>{SHARED_PAYOUT_NOTE}</span>}
                     </td>
                     <td>
                       {receiptId ? (

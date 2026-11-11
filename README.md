@@ -13,7 +13,9 @@ New workspaces also get two **synthetic creators**, so the Brand page's creator 
 | Maya Lindqvist | **Synthetic creator: fictional person, AI-generated face** | Fitness | $2.50 an image, video 2× | advertising, social, editorial | 8 renders, 21 days | no licence: send a request, then see **Review with agent** as Maya |
 | Theo Marlowe | **Synthetic creator: fictional person, AI-generated face** | Tech & gadgets | $3.50 an image, images only | advertising, internal | 5 renders, 14 days | licence pre-approved |
 
-They are labelled the same way wherever they appear. Their reference portraits are AI-generated faces of fictional
+They are labelled the same way wherever they appear. They have no PayPal accounts of their own: their payouts go to
+the same sandbox account as Rohit's (`PAYPAL_SANDBOX_CREATOR_EMAIL`), noted as "Synthetic creator: sandbox payout
+account shared with the demo" in the ledger and on the receipt. Their reference portraits are AI-generated faces of fictional
 adults (`pnpm portraits:synthetic`, gated), sealed into the database like Rohit's photo.
 
 **The 3-minute path**

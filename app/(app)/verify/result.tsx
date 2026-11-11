@@ -4,7 +4,7 @@ import { Card, CreatorFace, StatusPill, type PillKind } from "@/components/ds";
 import { IconCheck, IconCross, IconQuestion, IconShield } from "@/components/ds/icons";
 import { SyntheticBadge } from "@/components/dashboard/kit";
 import { PayPalId } from "@/components/dashboard/shared";
-import { isSynthetic } from "@/lib/personas";
+import { isSynthetic, SHARED_PAYOUT_NOTE } from "@/lib/personas";
 import type { VerifyResult } from "@/lib/verify";
 
 const LOOK: Record<VerifyResult["verdict"], { pill: PillKind; card: string; mark: ReactNode; stamp: string }> = {
@@ -74,6 +74,7 @@ export function Result({ result: v }: { result: VerifyResult }) {
                           "Creator payout (90%)",
                           <span key="p">
                             <PayPalId id={p.paypal.payoutBatchId} /> · {usd(p.creatorPayoutCents)}
+                            {isSynthetic(v.creator?.photoRef) && <span className="block text-[11px] text-grey">{SHARED_PAYOUT_NOTE}</span>}
                           </span>,
                         ],
                       ]

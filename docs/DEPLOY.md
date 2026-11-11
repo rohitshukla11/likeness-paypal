@@ -31,8 +31,7 @@ Neon Postgres. Nothing is stored on Render's disk, which is ephemeral.
 | `NEXT_TELEMETRY_DISABLED` | `1` | |
 | `PAYPAL_ENV` | `sandbox` | |
 | `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET` | secret | the same sandbox app as `.env.local` |
-| `PAYPAL_SANDBOX_CREATOR_EMAIL` | secret | the sandbox personal account that receives payouts |
-| `PAYPAL_SANDBOX_CREATOR2_EMAIL`, `PAYPAL_SANDBOX_CREATOR3_EMAIL` | secret | sandbox personal accounts paid for the two synthetic demo creators (Maya Lindqvist, Theo Marlowe: fictional people, AI-generated faces); new demo workspaces only |
+| `PAYPAL_SANDBOX_CREATOR_EMAIL` | secret | the sandbox personal account that receives payouts (Rohit's, and the two synthetic creators' too: they share it) |
 | `DEMO_VAULT_ID` | secret | the shared sandbox wallet behind "Use demo wallet" (same as local) |
 | `PAYPAL_WEBHOOK_ID` | secret | from `pnpm paypal:webhook --confirm` (step 4) |
 | `APP_BASE_URL` | `https://likeness-r2t7.onrender.com` (the live service; Render added the `-r2t7` suffix because `likeness` was taken) | PayPal return URLs, receipts, C2PA |

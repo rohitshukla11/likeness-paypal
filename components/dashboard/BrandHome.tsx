@@ -11,7 +11,7 @@ import { btnClass, CreatorFace, StatusPill } from "@/components/ds";
 import { PayPalId, renderPill, STATUS_LABEL, usd, when } from "@/components/dashboard/shared";
 import { chipClass, Field, fmtDay, inputClass, StatusBadge } from "@/components/ui";
 import type { brandRenders, brandView } from "@/lib/queries";
-import { isSynthetic } from "@/lib/personas";
+import { isSynthetic, SHARED_PAYOUT_NOTE } from "@/lib/personas";
 import { CreatorBrowse } from "./CreatorBrowse";
 import { Banner, CHIP, Empty, Fact, MUTED, Monogram, OUTLINE, Panel, Stat, StatsRow, SURFACE, SyntheticBadge } from "./kit";
 
@@ -217,7 +217,7 @@ export function BrandHome({ v, renders, notice, demoWallet, picked }: { v: View;
                 </tr>
               </thead>
               <tbody>
-                {charged.map(({ render: r, creatorName, receiptId }) => (
+                {charged.map(({ render: r, creatorName, creatorPhoto, receiptId }) => (
                   <tr key={r.id} className="border-t border-divider">
                     <td className="py-2.5 pr-3 whitespace-nowrap">{when(r.createdAt)}</td>
                     <td className="pr-3">{creatorName}</td>
@@ -228,7 +228,10 @@ export function BrandHome({ v, renders, notice, demoWallet, picked }: { v: View;
                     <td className="pr-3">
                       <PayPalId id={r.captureId} />
                     </td>
-                    <td className="pr-3">{r.payoutBatchId ? <PayPalId id={r.payoutBatchId} /> : r.refundId ? <PayPalId id={r.refundId} /> : <span className={MUTED}>–</span>}</td>
+                    <td className="pr-3">
+                      {r.payoutBatchId ? <PayPalId id={r.payoutBatchId} /> : r.refundId ? <PayPalId id={r.refundId} /> : <span className={MUTED}>–</span>}
+                      {r.payoutBatchId && isSynthetic(creatorPhoto) && <span className={`block text-[11px] ${MUTED}`}>{SHARED_PAYOUT_NOTE}</span>}
+                    </td>
                     <td>
                       {receiptId ? (
                         <Link href={`/verify/${receiptId}`} className="inline-flex min-h-11 items-center font-semibold text-ink underline">

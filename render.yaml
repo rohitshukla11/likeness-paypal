@@ -30,11 +30,6 @@ services:
         sync: false
       - key: PAYPAL_SANDBOX_CREATOR_EMAIL
         sync: false
-      # Synthetic demo creators' sandbox payout emails (Maya Lindqvist, Theo Marlowe): set in Render
-      - key: PAYPAL_SANDBOX_CREATOR2_EMAIL
-        sync: false
-      - key: PAYPAL_SANDBOX_CREATOR3_EMAIL
-        sync: false
       - key: DEMO_VAULT_ID
         sync: false
       - key: PAYPAL_WEBHOOK_ID

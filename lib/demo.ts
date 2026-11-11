@@ -38,7 +38,8 @@ export async function createWorkspace(opts: { creatorEmail?: string | null; bran
         workspaceId: id,
         name: p.name,
         photoRef: p.photo,
-        payoutPaypalEmail: p.key === "rohit" && opts.creatorEmail !== undefined ? opts.creatorEmail : (process.env[p.payoutEnv] ?? null),
+        // One sandbox payout account for all three (the synthetic creators share the demo's).
+        payoutPaypalEmail: opts.creatorEmail === undefined ? (process.env.PAYPAL_SANDBOX_CREATOR_EMAIL ?? null) : opts.creatorEmail,
         ...p.terms,
         // Distinct times, so "the workspace's first creator" is always Rohit.
         createdAt: new Date(now + i),
