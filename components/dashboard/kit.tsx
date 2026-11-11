@@ -4,6 +4,7 @@
  * small rule and fact tiles, and pill-outline actions. Server-safe (no hooks).
  */
 import type { ReactNode } from "react";
+import { SYNTHETIC_LABEL } from "@/lib/personas";
 
 export const SURFACE = "rounded-[22px] bg-white text-ink ring-1 ring-black/[0.04]";
 export const MUTED = "text-grey";
@@ -101,4 +102,9 @@ export function Fact({ label, value }: { label: string; value: ReactNode }) {
 /** A plain-words empty state inside a section. */
 export function Empty({ children }: { children: ReactNode }) {
   return <p className={`m-0 rounded-[16px] bg-white/60 p-4 text-[14px] ${MUTED}`}>{children}</p>;
+}
+
+/** The label a synthetic creator (fictional person, AI-generated face) carries wherever it appears. */
+export function SyntheticBadge({ className = "" }: { className?: string }) {
+  return <span className={`${CHIP} self-start whitespace-normal bg-sky text-ink ${className}`}>{SYNTHETIC_LABEL}</span>;
 }
