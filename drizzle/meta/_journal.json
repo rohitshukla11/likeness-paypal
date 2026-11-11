@@ -22,6 +22,13 @@
       "when": 1794329211168,
       "tag": "0002_confused_valkyrie",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1794373636747,
+      "tag": "0003_eager_power_man",
+      "breakpoints": true
     }
   ]
 }

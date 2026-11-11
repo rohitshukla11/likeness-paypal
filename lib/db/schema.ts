@@ -1,9 +1,12 @@
 /** Database schema (Drizzle, Postgres on Neon). Money is stored in integer cents with a currency code. */
 import { sql } from "drizzle-orm";
-import { boolean, index, integer, pgTable, text, timestamp, uniqueIndex, type AnyPgColumn } from "drizzle-orm/pg-core";
+import { boolean, customType, index, integer, pgTable, text, timestamp, uniqueIndex, type AnyPgColumn } from "drizzle-orm/pg-core";
 import { BANNED_USES } from "../engine/policy";
 
 export { BANNED_USES };
+
+/** Raw bytes (Postgres bytea) as a Node Buffer. */
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({ dataType: () => "bytea" });
 
 const ts = (name: string) => timestamp(name, { withTimezone: true });
 const createdAt = () => ts("created_at").notNull().defaultNow();
@@ -179,6 +182,8 @@ export const renders = pgTable(
     outputSha256: text("output_sha256"),
     outputMime: text("output_mime"),
     model: text("model"),
+    /** Shown with the render, e.g. "demo render: the daily AI image cap is reached". */
+    renderNote: text("render_note"),
     status: text("status").notNull(),
     amountCents: integer("amount_cents").notNull(),
     currency: text("currency").notNull().default("USD"),
@@ -236,3 +241,25 @@ export const refusals = pgTable(
   },
   (t) => [index("refusals_render_idx").on(t.renderId)],
 );
+
+/** A generated file (image or video), stored with its render: there is no object store in this deployment. */
+export const renderMedia = pgTable("render_media", {
+  renderId: text("render_id")
+    .primaryKey()
+    .references(() => renders.id),
+  mime: text("mime").notNull(),
+  sha256: text("sha256").notNull(),
+  bytes: bytea("bytes").notNull(),
+  createdAt: createdAt(),
+});
+
+/**
+ * AI spend caps as atomic counters: key → count. A render reserves its keys in one transaction
+ * (UPDATE … WHERE count < limit), so two concurrent renders can never both take the last slot.
+ * Keys: image:day:<YYYY-MM-DD>, image:ws:<workspace id>, video:total.
+ */
+export const aiQuota = pgTable("ai_quota", {
+  key: text("key").primaryKey(),
+  count: integer("count").notNull().default(0),
+  updatedAt: ts("updated_at").notNull().defaultNow(),
+});

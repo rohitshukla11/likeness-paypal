@@ -13,10 +13,11 @@
     "check:agent-toolkit": "tsx --env-file-if-exists=.env.local scripts/agent-toolkit-check.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "test": "tsx --test --test-reporter=spec tests/*.test.ts",
+    "test": "tsx --conditions=react-server --test --test-reporter=spec tests/*.test.ts",
     "e2e:engine": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/engine-e2e.ts"
   },
   "dependencies": {
+    "@google/genai": "2.31.0",
     "@neondatabase/serverless": "1.2.0",
     "@paypal/agent-toolkit": "1.11.0",
     "ai": "4.3.19",
@@ -24,7 +25,8 @@
     "next": "16.4.3",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "server-only": "0.0.1"
+    "server-only": "0.0.1",
+    "sharp": "0.35.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "4.3.3",
