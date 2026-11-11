@@ -13,8 +13,32 @@ Then the creator is paid 90% through PayPal Payouts when the brand accepts the a
 
 - **Working end to end in the PayPal sandbox:** the render engine, the Brand, Studio, Creator and Verify pages, and
   signed receipts.
-- **Renders:** pre-generated demo images through the StubProvider. No AI calls yet; the Gemini provider is a
-  skeleton.
+- **Renders:** the StubProvider (pre-generated demo images, no cost) by default. With `RENDER_PROVIDER=gemini` and
+  `GEMINI_API_KEY`, the AI provider makes real ads on the **Gemini API** (never Vertex AI); see "AI ads" below.
+- **Content credentials (C2PA):** AI images and videos are signed with a locally made TEST certificate
+  (`sh scripts/c2pa-testcert.sh`). No cloud project is involved, so this was ported. The test signer is reported
+  untrusted, which is expected.
+- **Creator onboarding:** built, but behind `FEATURE_CREATOR_ONBOARDING` (off). The seeded demo personas are the
+  default.
+
+## AI ads
+
+| What | Model (Gemini API) | Caps | Over the cap |
+|---|---|---|---|
+| Image ads, from the creator's reference photo | `gemini-nano-banana-2.1`, 1K (about $0.034 per image) | `RENDER_CAP_DAILY`=30 per UTC day, `RENDER_CAP_PER_WORKSPACE`=3 | the labelled demo image stands in, and no AI call is made |
+| Video ads, priced at 3× an image | `gemini-omni-1.2-flash`, 4 s at 720p (about $0.28) | `VIDEO_CAP_TOTAL`=3 in total | the saved clip `private/demo-video.mp4` plays, labelled "demo render" |
+| Prompt safety filter, run before every AI render | `gemini-3.5-flash-lite`, plus local banned-use rules; fails closed | – | – |
+
+- **Video model:** video uses **Gemini Omni Flash**, not Veo. Veo's previews on the Gemini API were shut down on
+  2026-10-22, and Veo GA is only on Google's enterprise platform (Vertex), which this app doesn't use.
+- **Video jobs:** they run in the background and are polled with a timeout (`VIDEO_TIMEOUT_MS`, 300 s); a stuck job
+  is cancelled. A failed render, video or filter refusal voids the PayPal authorization, so the brand is never
+  charged for it.
+- **Caps:** the caps are atomic counters in Postgres (`ai_quota`).
+- **Storage:** generated files are stored with their render and served at `/media/<render id>`.
+- **Reference photo:** the demo creator's photo is `private/rohit.jpg` (git-ignored).
+- **One gated render:** `pnpm ai:once --kind image|video` makes exactly one render through the whole engine. It runs
+  only with `--confirm`, and is a dry run otherwise.
 
 ## How payments work
 
@@ -54,6 +78,8 @@ pnpm dev                     # http://localhost:3000 → Continue as Brand / Cre
 | `pnpm test` | unit tests: policy refusals, and the engine on an in-memory store with a mocked PayPal |
 | `pnpm e2e:engine` | the engine against the PayPal sandbox (StubProvider): accept, reject, deadline and revoke paths |
 | `pnpm smoke:paypal` | raw PayPal sandbox run: vault, authorize, capture, payout, void, refund |
+| `pnpm ai:once --kind image\|video [--confirm]` | one real AI render through the engine; dry run (no Gemini call) without `--confirm` |
+| `pnpm face:models` | download the face matcher's weights (onboarding only, ~260 MB, sha256-pinned) |
 | `pnpm paypal:fresh-token` | terminate the cached sandbox token, fetch a new one, flag missing Vault or Payouts scopes |
 | `pnpm typecheck && pnpm lint && pnpm build` | checks |
 
