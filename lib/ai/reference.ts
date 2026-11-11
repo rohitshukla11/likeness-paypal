@@ -35,7 +35,7 @@ export async function referencePhotos(photoRef: string | null, purpose: { render
     const b = await openSealedBlob(persona.asset).catch(() => null);
     if (b) return [{ bytes: b.bytes, mime: b.mime === "image/png" ? "image/png" : "image/jpeg" }];
     for (const ext of ["jpg", "png"] as const) {
-      const file = path.join(PRIVATE(), `${persona.file}.${ext}`);
+      const file = path.join(/*turbopackIgnore: true*/ PRIVATE(), `${persona.file}.${ext}`);
       const bytes = await readFile(/*turbopackIgnore: true*/ file).catch(() => null);
       if (bytes) return [{ bytes: new Uint8Array(bytes), mime: ext === "png" ? "image/png" : "image/jpeg" }];
     }
