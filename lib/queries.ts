@@ -5,6 +5,7 @@ import { alias } from "drizzle-orm/pg-core";
 import { db } from "./db";
 import { brands, creators, licences, mandates, paypalVaultTokens, receipts, refusals, renders } from "./db/schema";
 import { utcDayStart } from "./engine/policy";
+import { toCard } from "./creator-browse";
 import { listFor } from "./licences";
 
 export async function creatorView(creatorId: string) {
@@ -39,7 +40,7 @@ export async function brandView(brandId: string) {
   const [wallet] = brand?.paymentTokenId ? await db().select().from(paypalVaultTokens).where(eq(paypalVaultTokens.paymentTokenId, brand.paymentTokenId)) : [];
   const ws = brand?.workspaceId;
   // Live creators only: a draft from creator onboarding isn't offered to brands until it goes live.
-  const workspaceCreators = ws ? await db().select().from(creators).where(and(eq(creators.workspaceId, ws), eq(creators.status, "live"))) : [];
+  const workspaceCreators = ws ? await db().select().from(creators).where(and(eq(creators.workspaceId, ws), eq(creators.status, "live"))).orderBy(creators.createdAt, creators.id) : [];
   const brandLicences = await listFor("brandId", brandId);
   let spentToday = 0;
   if (mandate) {
@@ -50,7 +51,9 @@ export async function brandView(brandId: string) {
     const start = utcDayStart(new Date());
     spentToday = today.filter((r) => r.createdAt >= start).reduce((s, r) => s + r.amount, 0);
   }
-  return { brand, mandate: mandate ?? null, wallet: wallet ? { ...wallet, kind: (brand.walletKind ?? "own") as "own" | "demo" } : null, creators: workspaceCreators, licences: brandLicences, spentToday };
+  // The creator browser's cards (and the agent's list_creators): terms, niche, synthetic label, this brand's licence.
+  const cards = workspaceCreators.map((c) => toCard(c, brandLicences));
+  return { brand, mandate: mandate ?? null, wallet: wallet ? { ...wallet, kind: (brand.walletKind ?? "own") as "own" | "demo" } : null, creators: workspaceCreators, cards, licences: brandLicences, spentToday };
 }
 
 /** The brand's renders, newest first, with the latest refusal reason and the receipt id. */

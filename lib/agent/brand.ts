@@ -14,6 +14,7 @@ import { newId } from "../errors";
 import { licenceState } from "../licences";
 import type { EngineDeps, RenderRow } from "../engine/render-and-pay";
 import { renderAndPay } from "../engine/render-and-pay";
+import { filterCreators, SYNTHETIC_LABEL, termsSummary, type CreatorFilter } from "../creator-browse";
 import { brandView } from "../queries";
 import { runAgent, type AgentEvent, type AgentTool } from "./llm";
 import { reportingNote, summarizeOrder } from "./paypal-summary";
@@ -75,6 +76,7 @@ Rules:
 - After an ad is made, say in one or two sentences what happened (authorized, rendered, checked, captured) and that the brand can Accept (the creator is paid 90% and the receipt is signed) or Reject (refund) in the Studio before the review window closes.
 - For spend questions, call spend_summary, then list_transactions. Answer with the figures from spend_summary. If list_transactions returns a "note", add that note as one short sentence, word for word, and say nothing else about PayPal's reporting; otherwise you may add how many of the brand's transactions PayPal already shows ("yours"). Never quote the whole merchant account's figures as the brand's. Two sentences at most.
 - For PayPal's record of an ad ("show me PayPal's record for my last ad"), call get_order (leave id empty for the last ad) and summarise in one or two sentences: the order status, the authorization amount and status, the capture amount and status, and the capture id (and the refund, if there is one).
+- To find or compare creators ("find me a fitness creator under $3"), call list_creators with the filters the user gives (niche, max price per image in dollars, use, video, licensed or not, name). Name each match with its niche and terms in one short line; if a creator is synthetic, say "synthetic creator: fictional person, AI-generated face" with its name. If the brand has no licence with a match, say they can request one on the Brand page.
 - For anything about licences, the wallet or limits, call get_status.
 - Keep answers short and plain. No markdown tables.`;
 
@@ -101,12 +103,55 @@ export async function runBrandAgent(input: { workspaceId: string; brandId: strin
           mandate: v.mandate
             ? { status: v.mandate.status, perRenderMax: usd(v.mandate.maxPerRenderCents), dailyCap: usd(v.mandate.dailyCapCents), spentToday: usd(v.spentToday), budget: usd(v.mandate.totalBudgetCents), spent: usd(v.mandate.spentCents), stepUpAbove: usd(v.mandate.stepUpThresholdCents) }
             : null,
-          licences: v.licences.map((l) => ({ creator: l.creatorName, state: l.state, uses: l.allowedUses, renders: `${l.rendersUsed}/${l.renderCap}`, pricePerImage: usd(l.pricePerRenderCents), pricePerVideo: usd(l.pricePerRenderCents * l.videoMultiplier), until: l.expiresAt?.toISOString().slice(0, 10) ?? null })),
+          licences: v.licences.map((l) => ({ creator: l.creatorName, state: l.state, uses: l.allowedUses, renders: `${l.rendersUsed}/${l.renderCap}`, pricePerImage: usd(l.pricePerRenderCents), pricePerVideo: l.videoMultiplier > 0 ? usd(l.pricePerRenderCents * l.videoMultiplier) : "images only", until: l.expiresAt?.toISOString().slice(0, 10) ?? null })),
         };
       },
       summarize: (r) => {
         const x = r as { wallet: string; licences: unknown[] };
         return `wallet ${x.wallet}, ${x.licences.length} licence(s)`;
+      },
+    },
+    {
+      name: "list_creators",
+      description: "The creators this brand can license, filtered: niche, price per image, allowed use, video or images only, licensed or not, name. The same list and filters as the Brand page's creator browser.",
+      parameters: {
+        type: "object",
+        properties: {
+          niche: { type: "string", description: "e.g. fitness, tech, lifestyle" },
+          max_price: { type: "number", description: "Highest price per image in dollars, e.g. 3" },
+          use: { type: "string", enum: ["advertising", "social", "editorial", "internal"] },
+          video: { type: "boolean", description: "true: must allow video; false: images only" },
+          licensed: { type: "boolean", description: "true: only creators the brand already has an active licence with; false: only those it doesn't" },
+          name: { type: "string", description: "Part of the creator's name" },
+        },
+      },
+      async run(args) {
+        const v = await brandView(brandId);
+        const price = Number(args.max_price);
+        const f: CreatorFilter = {
+          q: typeof args.name === "string" ? args.name : undefined,
+          niche: typeof args.niche === "string" ? args.niche : undefined,
+          maxPriceCents: args.max_price !== undefined && Number.isFinite(price) && price >= 0 ? Math.round(price * 100) : undefined,
+          use: typeof args.use === "string" && args.use ? args.use : undefined,
+          format: args.video === true ? "video" : args.video === false ? "image_only" : undefined,
+          licence: args.licensed === true ? "licensed" : args.licensed === false ? "not_yet" : undefined,
+        };
+        const found = filterCreators(v.cards, f);
+        return {
+          matches: found.map((c) => ({
+            name: c.name,
+            ...(c.synthetic ? { label: SYNTHETIC_LABEL } : {}),
+            niche: c.niche,
+            terms: termsSummary(c),
+            licence: c.licence === "licensed" ? "you have an active licence" : c.licence === "requested" ? "your request is waiting for the creator" : "no licence yet",
+            accepting: c.accepting,
+          })),
+          of: v.cards.length,
+        };
+      },
+      summarize: (r) => {
+        const x = r as { matches: { name: string }[]; of: number };
+        return `${x.matches.length} of ${x.of} creator(s)${x.matches.length ? `: ${x.matches.map((m) => m.name).join(", ")}` : ""}`;
       },
     },
     {

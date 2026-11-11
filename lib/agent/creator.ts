@@ -46,7 +46,7 @@ export async function reviewLicence(input: { workspaceId: string; creatorId: str
   const outside = l.allowedUses.filter((u) => !c.allowedUses.includes(u));
   const tooLong = l.days > c.maxDays;
   const tooMany = l.renderCap > c.maxRendersPerLicence;
-  step("terms", outside.length || tooLong || tooMany ? "failed" : "ok", outside.length || tooLong || tooMany ? `outside your terms: ${[outside.length ? `uses ${outside.join(", ")}` : "", tooLong ? `${l.days} days (max ${c.maxDays})` : "", tooMany ? `${l.renderCap} renders (max ${c.maxRendersPerLicence})` : ""].filter(Boolean).join("; ")}` : `within your terms (${usd(c.pricePerRenderCents)} per image, video ${c.videoMultiplier}×)`);
+  step("terms", outside.length || tooLong || tooMany ? "failed" : "ok", outside.length || tooLong || tooMany ? `outside your terms: ${[outside.length ? `uses ${outside.join(", ")}` : "", tooLong ? `${l.days} days (max ${c.maxDays})` : "", tooMany ? `${l.renderCap} renders (max ${c.maxRendersPerLicence})` : ""].filter(Boolean).join("; ")}` : `within your terms (${usd(c.pricePerRenderCents)} per image, ${c.videoMultiplier > 0 ? `video ${c.videoMultiplier}×` : "images only"})`);
   const past = await db().select({ status: licences.status }).from(licences).where(and(eq(licences.brandId, l.brandId), eq(licences.creatorId, l.creatorId)));
   const pastRenders = await db().select({ status: renders.status }).from(renders).innerJoin(licences, eq(licences.id, renders.licenceId)).where(and(eq(licences.brandId, l.brandId), eq(licences.creatorId, l.creatorId)));
   const history = { licences: past.length - 1, revoked: past.filter((p) => p.status === "revoked").length, ads: pastRenders.length, rejected: pastRenders.filter((r) => r.status === "rejected").length };
