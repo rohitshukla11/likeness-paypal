@@ -116,7 +116,7 @@ Then the creator is paid 90% through PayPal Payouts when the brand accepts the a
 | What | Model (Gemini API) | Caps | Over the cap |
 |---|---|---|---|
 | Image ads, from the creator's reference photo | `gemini-nano-banana-2.1`, 1K (about $0.034 per image) | `RENDER_CAP_DAILY` per UTC day (10 on the live demo, 30 by default), `RENDER_CAP_PER_WORKSPACE`=3 | the labelled demo image stands in, and no AI call is made |
-| Video ads, priced at 3× an image, starting from one of the brand's generated ad images (its first frame, never the raw photo) | `gemini-omni-1.2-flash`, 4 s at 720p, task `image_to_video` (about $0.28) | `VIDEO_CAP_TOTAL`=3 in total | the saved clip `private/demo-video.mp4` plays, labelled "demo render" |
+| Video ads, priced at 3× an image, starting from one of the brand's generated ad images (its first frame, never the raw photo) | `gemini-omni-1.2-flash`, 4 s at 720p, task `image_to_video` (about $0.28) | `VIDEO_CAP_TOTAL`=5 in total on the live demo (3 by default) | the saved clip `private/demo-video.mp4` plays, labelled "demo render" |
 | Prompt safety filter, run before every AI render | `gemini-3.5-flash-lite`, plus local banned-use rules; fails closed | – | – |
 
 - **Video model:** video uses **Gemini Omni Flash**, not Veo. Veo's previews on the Gemini API were shut down on
@@ -124,7 +124,10 @@ Then the creator is paid 90% through PayPal Payouts when the brand accepts the a
 - **Video jobs:** they run in the background and are polled with a timeout (`VIDEO_TIMEOUT_MS`, 300 s); a stuck job
   is cancelled. A failed render, video or filter refusal voids the PayPal authorization, so the brand is never
   charged for it.
-- **Caps:** the caps are atomic counters in Postgres (`ai_quota`).
+- **Caps:** the caps are atomic counters in Postgres (`ai_quota`), reserved in one place (`reserveAi`): an image (or
+  a face-check regeneration) takes a slot in the daily and the per-workspace image caps together, all or nothing; a
+  video takes one from the video total. Concurrent renders can't overshoot a cap. Local runs and `pnpm ai:once`
+  count against the same counters as the live demo.
 - **Storage:** generated files are stored with their render and served at `/media/<render id>`.
 - **Reference photo:** the demo creator's photo is `private/rohit.jpg` (git-ignored). The synthetic creators'
   portraits are `private/maya.jpg` and `private/theo.jpg` (AI-generated faces of fictional people, made by
