@@ -1,7 +1,9 @@
 import "server-only";
 /**
  * The creator's reference photos, kept outside the repo in private/ (git-ignored):
- *   - the seeded demo creator "Rohit" (photo_ref /demo/rohit.svg, an illustration) uses private/rohit.jpg;
+ *   - a seeded demo creator (photo_ref /demo/<key>.svg, an illustration; lib/personas.ts) uses its sealed upload
+ *     asset:<key>-reference from `pnpm seed:assets`, or locally private/<key>.jpg (or .png): Rohit's real photo, or
+ *     the AI-generated portrait of a synthetic creator;
  *   - a creator whose photo_ref is "private:<file>" uses private/<file>;
  *   - an onboarded creator (photo_ref /media/creator/<id>) uses their encrypted frames, opened for this render and
  *     logged (lib/onboarding/vault.ts).
@@ -9,13 +11,15 @@ import "server-only";
  */
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { personaOf } from "../personas";
 import type { Reference } from "./provider";
 
 const PRIVATE = () => path.resolve(/*turbopackIgnore: true*/ process.cwd(), process.env.PRIVATE_DIR || "private");
 
 export function referencePath(photoRef: string | null): string | null {
   if (!photoRef) return null;
-  if (photoRef === "/demo/rohit.svg") return path.join(PRIVATE(), "rohit.jpg");
+  const persona = personaOf(photoRef);
+  if (persona) return path.join(PRIVATE(), `${persona.file}.jpg`);
   if (photoRef.startsWith("private:")) {
     const file = path.basename(photoRef.slice("private:".length));
     return file ? path.join(PRIVATE(), file) : null;
@@ -24,11 +28,17 @@ export function referencePath(photoRef: string | null): string | null {
 }
 
 export async function referencePhotos(photoRef: string | null, purpose: { renderId?: string; licenceId?: string } = {}): Promise<Reference[]> {
-  if (photoRef === "/demo/rohit.svg") {
+  const persona = personaOf(photoRef);
+  if (persona) {
     // Deployed: the sealed upload from `pnpm seed:assets` (blobs). Locally it may only be on disk (below).
-    const { ASSETS, openSealedBlob } = await import("../blobs");
-    const b = await openSealedBlob(ASSETS.reference).catch(() => null);
+    const { openSealedBlob } = await import("../blobs");
+    const b = await openSealedBlob(persona.asset).catch(() => null);
     if (b) return [{ bytes: b.bytes, mime: b.mime === "image/png" ? "image/png" : "image/jpeg" }];
+    for (const ext of ["jpg", "png"] as const) {
+      const bytes = await readFile(/*turbopackIgnore: true*/ path.join(PRIVATE(), `${persona.file}.${ext}`)).catch(() => null);
+      if (bytes) return [{ bytes: new Uint8Array(bytes), mime: ext === "png" ? "image/png" : "image/jpeg" }];
+    }
+    return [];
   }
   const onboarded = photoRef?.match(/^\/media\/creator\/(cre_[A-Za-z0-9_-]+)$/);
   if (onboarded) {

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 500" width="400" height="500" role="img" aria-label="Maya Lindqvist, synthetic creator: fictional person (illustration)">
+<title>Maya Lindqvist, synthetic creator: fictional person (illustration)</title>
+<defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#d6f5ec"/><stop offset="1" stop-color="#a8e0cf"/></linearGradient></defs>
+<rect width="400" height="500" fill="url(#bg)"/><g>
+  <path d="M276 210 C318 236 322 318 296 360 C288 316 280 276 262 246Z" fill="#7a4a2a"/>
+  <ellipse cx="200" cy="470" rx="150" ry="110" fill="#e4572e"/>
+  <rect x="172" y="300" width="56" height="70" rx="20" fill="#e7b796"/>
+  <ellipse cx="200" cy="240" rx="84" ry="100" fill="#e7b796"/>
+  <path d="M114 240 C104 150 162 116 206 118 C258 120 298 160 286 240 C272 190 240 168 200 168 C160 168 128 190 114 240Z" fill="#7a4a2a"/>
+  <path d="M128 196 C170 172 236 172 274 196" stroke="#1d8a6b" stroke-width="12" fill="none" stroke-linecap="round"/>
+  <ellipse cx="168" cy="248" rx="8" ry="9" fill="#2b2220"/><ellipse cx="232" cy="248" rx="8" ry="9" fill="#2b2220"/>
+  <path d="M152 226 q16 -8 32 0 M216 226 q16 -8 32 0" stroke="#5a3620" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <path d="M200 254 q-5 22 4 28" stroke="#c99474" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <path d="M170 300 q30 26 60 0" stroke="#b0453a" stroke-width="6" fill="none" stroke-linecap="round"/>
+</g>
+</svg>

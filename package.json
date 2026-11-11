@@ -18,6 +18,7 @@
     "face:models": "sh scripts/face-models.sh",
     "ai:once": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/ai-render-once.ts",
     "seed:assets": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/seed-assets.ts",
+    "portraits:synthetic": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/synthetic-portraits.ts",
     "paypal:webhook": "tsx --env-file-if-exists=.env.local scripts/paypal-webhook.ts",
     "e2e:live": "tsx --env-file-if-exists=.env.local scripts/e2e-live.ts"
   },

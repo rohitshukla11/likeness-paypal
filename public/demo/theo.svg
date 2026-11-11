@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 500" width="400" height="500" role="img" aria-label="Theo Marlowe, synthetic creator: fictional person (illustration)">
+<title>Theo Marlowe, synthetic creator: fictional person (illustration)</title>
+<defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fdebd2"/><stop offset="1" stop-color="#f4cf9e"/></linearGradient></defs>
+<rect width="400" height="500" fill="url(#bg)"/><g>
+  <ellipse cx="200" cy="470" rx="150" ry="110" fill="#2b2d42"/>
+  <rect x="172" y="300" width="56" height="70" rx="20" fill="#9c6b4e"/>
+  <ellipse cx="200" cy="240" rx="86" ry="100" fill="#9c6b4e"/>
+  <path d="M116 222 C116 156 160 130 204 130 C252 130 290 158 284 222 C270 196 244 184 204 184 C162 184 134 196 116 222Z" fill="#2a1d16"/>
+  <circle cx="168" cy="248" r="24" fill="none" stroke="#1b1b1f" stroke-width="6"/><circle cx="232" cy="248" r="24" fill="none" stroke="#1b1b1f" stroke-width="6"/>
+  <path d="M192 248 h16" stroke="#1b1b1f" stroke-width="6"/>
+  <ellipse cx="168" cy="248" rx="7" ry="8" fill="#2b2220"/><ellipse cx="232" cy="248" rx="7" ry="8" fill="#2b2220"/>
+  <path d="M200 258 q-5 22 4 28" stroke="#7d523a" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <path d="M176 304 q24 16 48 0" stroke="#5e2e27" stroke-width="6" fill="none" stroke-linecap="round"/>
+  <path d="M148 320 q52 40 104 0" stroke="#2a1d16" stroke-width="10" fill="none" stroke-linecap="round" opacity="0.55"/>
+</g>
+</svg>

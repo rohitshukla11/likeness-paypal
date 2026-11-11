@@ -5,6 +5,17 @@
 **Live (PayPal sandbox):** https://likeness-r2t7.onrender.com. No sign-up: each visitor gets a private demo workspace,
 with a creator (Rohit) who has already approved one licence for the demo brand.
 
+New workspaces also get two **synthetic creators**, so the Brand page's creator filter has something to filter:
+
+| Creator | | Niche | Price | Allowed uses | Per licence | Demo brand |
+|---|---|---|---|---|---|---|
+| Rohit | real person (the author, consenting) | Lifestyle & food | $2.00 an image, video 3× | advertising, social | 10 renders, 30 days | licence pre-approved |
+| Maya Lindqvist | **Synthetic creator: fictional person, AI-generated face** | Fitness | $2.50 an image, video 2× | advertising, social, editorial | 8 renders, 21 days | no licence: send a request, then see **Review with agent** as Maya |
+| Theo Marlowe | **Synthetic creator: fictional person, AI-generated face** | Tech & gadgets | $3.50 an image, images only | advertising, internal | 5 renders, 14 days | licence pre-approved |
+
+They are labelled the same way wherever they appear. Their reference portraits are AI-generated faces of fictional
+adults (`pnpm portraits:synthetic`, gated), sealed into the database like Rohit's photo.
+
 **The 3-minute path**
 
 1. Open the live URL and choose **Continue as Brand**.
@@ -112,7 +123,9 @@ Then the creator is paid 90% through PayPal Payouts when the brand accepts the a
   charged for it.
 - **Caps:** the caps are atomic counters in Postgres (`ai_quota`).
 - **Storage:** generated files are stored with their render and served at `/media/<render id>`.
-- **Reference photo:** the demo creator's photo is `private/rohit.jpg` (git-ignored).
+- **Reference photo:** the demo creator's photo is `private/rohit.jpg` (git-ignored). The synthetic creators'
+  portraits are `private/maya.jpg` and `private/theo.jpg` (AI-generated faces of fictional people, made by
+  `pnpm portraits:synthetic`, a dry run unless `--confirm`); `pnpm seed:assets` seals all three into the database.
 - **One gated render:** `pnpm ai:once --kind image|video` makes exactly one render through the whole engine. It runs
   only with `--confirm`, and is a dry run otherwise.
 
@@ -159,7 +172,8 @@ pnpm dev                     # http://localhost:3000 → Continue as Brand / Cre
 | `pnpm paypal:fresh-token` | terminate the cached sandbox token, fetch a new one, flag missing Vault or Payouts scopes |
 | `pnpm typecheck && pnpm lint && pnpm build` | checks |
 
-The demo gives each visitor their own workspace (a creator, Rohit, and a demo brand) through a cookie. **Reset demo**
+The demo gives each visitor their own workspace (three creators: Rohit and the two synthetic creators, and a demo
+brand) through a cookie. On the Creator page, pick which creator you play. **Reset demo**
 starts a new workspace and deletes nothing.
 
 ## Layout

@@ -7,11 +7,13 @@ Neon Postgres. Nothing is stored on Render's disk, which is ephemeral.
 
 1. **Schema:** the migrations are already applied to Neon (`pnpm db:migrate`, through 0006). Neon is the same
    database locally and deployed.
-2. **Assets:** run `pnpm seed:assets` locally. It uploads two files from `private/` into Neon:
+2. **Assets:** run `pnpm seed:assets` locally. It uploads these files from `private/` into Neon:
    - `rohit.jpg`, sealed with `PHOTO_KEK`
+   - `maya.jpg` and `theo.jpg` (the synthetic creators' AI-generated portraits from `pnpm portraits:synthetic`),
+     sealed with `PHOTO_KEK`; skipped while missing
    - `demo-video.mp4`
 
-   It reads both back to check them.
+   It reads each back to check it.
 3. **Blueprint:** create it in Render from this repo (`render.yaml`). Render asks for every `sync: false` value
    below. Deploys are manual (`autoDeploy: false`).
 4. **Webhook:** once the service is live at `APP_BASE_URL`, run `pnpm paypal:webhook --url <APP_BASE_URL>` (dry run),
@@ -30,6 +32,7 @@ Neon Postgres. Nothing is stored on Render's disk, which is ephemeral.
 | `PAYPAL_ENV` | `sandbox` | |
 | `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET` | secret | the same sandbox app as `.env.local` |
 | `PAYPAL_SANDBOX_CREATOR_EMAIL` | secret | the sandbox personal account that receives payouts |
+| `PAYPAL_SANDBOX_CREATOR2_EMAIL`, `PAYPAL_SANDBOX_CREATOR3_EMAIL` | secret | sandbox personal accounts paid for the two synthetic demo creators (Maya Lindqvist, Theo Marlowe: fictional people, AI-generated faces); new demo workspaces only |
 | `DEMO_VAULT_ID` | secret | the shared sandbox wallet behind "Use demo wallet" (same as local) |
 | `PAYPAL_WEBHOOK_ID` | secret | from `pnpm paypal:webhook --confirm` (step 4) |
 | `APP_BASE_URL` | `https://likeness-r2t7.onrender.com` (the live service; Render added the `-r2t7` suffix because `likeness` was taken) | PayPal return URLs, receipts, C2PA |

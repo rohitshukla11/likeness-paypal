@@ -17,6 +17,7 @@ const sha256 = (b: Uint8Array) => createHash("sha256").update(b).digest("hex");
 const ad = (key: string) => Buffer.from(`likeness-paypal|blob|${key}`);
 
 export const renderKey = (renderId: string) => `render:${renderId}`;
+/** Rohit's sealed reference photo (each seeded persona has its own: lib/personas.ts) and the demo clip. */
 export const ASSETS = { reference: "asset:rohit-reference", demoClip: "asset:demo-video" } as const;
 
 /** Stores a file once (later writes of the same key keep the first, like the render it belongs to). */
