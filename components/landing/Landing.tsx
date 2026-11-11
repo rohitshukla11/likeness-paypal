@@ -3,28 +3,39 @@
 /**
  * The landing page (Main.dc.html): lime hero with dropping nav and headline, a rising portrait
  * illustration and two endless ribbons; the "Built on" strip; the dark benefits block with counters;
- * the four-step accordion; the tilted, overlapping creator cards; the testimonial marquee (only with real quotes);
+ * the four-step accordion; the tilted, overlapping example cards; the testimonial marquee (only with real quotes);
  * the CTA band. Motion is CSS plus an IntersectionObserver hook, and static under reduced motion.
+ * Every "Continue as Brand / Creator" is a form posting the continueAs server action (app/actions.ts), so it works
+ * before hydration; `account` is a server-rendered slot (Reset demo when the visitor already has a workspace).
  */
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { useAuth } from "@/components/auth/AuthProvider";
-import { reason, signIn } from "@/lib/client/firebase";
+import { useState, type ReactNode } from "react";
+import { continueAs } from "@/app/actions";
 import { pillClass } from "@/components/ds";
 import { IconArrowLeft, IconArrowRight, IconChevron } from "@/components/ds/icons";
 import { useCountUp, useInView } from "@/components/ds/motion";
 import { BUILT_ON, MEASUREMENTS, TESTIMONIALS } from "@/lib/site-content";
 
+const asBrand = continueAs.bind(null, "brand");
+const asCreator = continueAs.bind(null, "creator");
 
-const RIBBON_A = ["Advertising", "✳", "Social", "✳", "Editorial", "✳", "Entertainment", "✳", "Product", "✳"];
-const RIBBON_B = ["Approve", "✳", "Get paid per render", "✳", "Revoke any time", "✳", "Verified by YouTube", "✳"];
+/** "Continue as Brand" / "Continue as Creator": the demo's way in (no sign-up; a private workspace per visitor). */
+function ContinueAs({ role, kind, className = "" }: { role: "brand" | "creator"; kind: Parameters<typeof pillClass>[0]; className?: string }) {
+  return (
+    <form action={role === "brand" ? asBrand : asCreator}>
+      <button className={pillClass(kind, `cursor-pointer ${className}`)}>{role === "brand" ? "Continue as Brand" : "Continue as Creator"}</button>
+    </form>
+  );
+}
 
-export function Landing() {
+const RIBBON_A = ["Advertising", "✳", "Social", "✳", "Editorial", "✳", "Internal", "✳", "Licensed once", "✳"];
+const RIBBON_B = ["Authorize", "✳", "Render", "✳", "Capture", "✳", "Payout 90%", "✳", "Or refund", "✳", "Revoke any time", "✳"];
+
+export function Landing({ account }: { account?: ReactNode }) {
   return (
     <main id="main" className="bg-ink font-sans text-ink">
-      <Hero />
+      <Hero account={account} />
       <Stats />
       <HowItWorks />
       <Creators />
@@ -50,41 +61,7 @@ function Ribbon({ words, dir, className, style }: { words: string[]; dir: "l" | 
   );
 }
 
-/** "Log in" opens Google's sign-in popup right here; once signed in, /start sends each person to their place. */
-function LoginButton() {
-  const { user } = useAuth();
-  const router = useRouter();
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-  const login = async () => {
-    if (user) return router.push("/start");
-    setBusy(true);
-    setErr(null);
-    try {
-      await signIn();
-      router.push("/start");
-    } catch (e) {
-      // Closing the popup is not an error.
-      if (!/popup-closed-by-user|cancelled-popup-request/.test(String((e as { code?: string }).code))) setErr(reason(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-  return (
-    <span className="flex flex-col items-end">
-      <button type="button" onClick={login} disabled={busy} className={pillClass("ink", "px-5 text-[14px] disabled:opacity-60")}>
-        {busy ? "Signing in…" : "Log in"}
-      </button>
-      {err && (
-        <span role="alert" className="max-w-[260px] text-right text-[12px] text-bad">
-          {err}
-        </span>
-      )}
-    </span>
-  );
-}
-
-function Hero() {
+function Hero({ account }: { account?: ReactNode }) {
   return (
     <section className="relative overflow-hidden bg-[linear-gradient(160deg,#D4F06A_0%,#E4F7A0_38%,#F2FAD6_100%)]">
       <svg aria-hidden="true" viewBox="0 0 1440 900" preserveAspectRatio="none" className="absolute inset-0 h-full w-full">
@@ -97,21 +74,19 @@ function Hero() {
 
       <header className="lk-drop relative mx-auto flex max-w-[1320px] flex-wrap items-center gap-x-7 gap-y-1 px-4 py-4 sm:px-8 sm:py-5">
         <Link href="/" className="font-display text-[18px] font-black tracking-[0.02em] text-ink no-underline sm:text-[20px]">
-          LIKENESS
+          LIKENESS <span className="font-sans text-[13px] font-semibold tracking-normal sm:text-[14px]">× PayPal</span>
         </Link>
         <nav aria-label="Main" className="order-3 flex w-full flex-wrap gap-x-4 text-[13px] font-medium sm:gap-x-7 sm:text-[14px] md:order-none md:w-auto md:flex-1">
           <a href="#how" className="py-3 text-ink no-underline hover:underline">
             How it works
           </a>
-          <Link href="/creators" className="py-3 text-ink no-underline hover:underline">
-            Creators
-          </Link>
           <Link href="/verify" className="py-3 text-ink no-underline hover:underline">
             Verify
           </Link>
         </nav>
-        <div className="ml-auto flex items-center gap-4">
-          <LoginButton />
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-2 sm:gap-3">
+          {account}
+          <ContinueAs role="brand" kind="ink" className="px-5 text-[14px]" />
         </div>
       </header>
 
@@ -130,6 +105,19 @@ function Hero() {
         </div>
         <Ribbon words={RIBBON_A} dir="l" className="top-[236px] z-10 bg-violet text-white sm:top-[476px]" style={{ transform: "rotate(4deg)" }} />
         <Ribbon words={RIBBON_B} dir="r" className="top-[266px] z-10 bg-[#4C5230] text-white sm:top-[514px]" style={{ transform: "rotate(-3deg)" }} />
+      </div>
+
+      <div className="relative mx-auto flex max-w-[760px] flex-col items-center gap-5 px-4 pt-16 text-center sm:px-8">
+        <p className="m-0 text-[clamp(16px,1.6vw,19px)] font-medium leading-relaxed text-[#3E4148]">
+          License your face to AI ads and get paid per ad, through PayPal. The creator approves a licence once; the brand approves a
+          mandate and saves its PayPal wallet once. Every ad is then authorized, rendered, captured, and paid out 90% to the creator, or
+          refunded.
+        </p>
+        <div className="flex flex-wrap justify-center gap-3">
+          <ContinueAs role="brand" kind="ink" className="px-6" />
+          <ContinueAs role="creator" kind="outline-dark" className="px-6" />
+        </div>
+        <p className="m-0 text-[13px] text-[#5F636B]">PayPal sandbox demo. Each visitor gets a private workspace with a creator (Rohit) and a demo brand. No sign-up.</p>
       </div>
 
       <div className="relative mx-auto flex max-w-[1180px] flex-wrap items-center justify-center gap-x-[clamp(24px,4.4vw,64px)] gap-y-3 px-4 pb-8 pt-12 text-[clamp(15px,1.4vw,18px)] font-semibold text-[#5F636B] sm:px-8">
@@ -155,7 +143,7 @@ function Toggle() {
 
 function Stats() {
   const { ref, seen } = useInView<HTMLDivElement>();
-  const pct = useCountUp(MEASUREMENTS.rendersWithReceipt.value, seen);
+  const pct = useCountUp(MEASUREMENTS.creatorShare.value, seen);
   return (
     <section className="on-dark bg-ink text-white">
       <div ref={ref} className="mx-auto flex max-w-[1180px] flex-col gap-10 px-4 py-24 sm:px-8">
@@ -184,17 +172,23 @@ function Stats() {
               </span>
             </div>
             <span className="mt-auto self-start rounded-full bg-violet-deep px-3.5 py-1.5 text-[13px] font-semibold text-white">For brands</span>
-            <h3 className="m-0 font-display text-[clamp(20px,2.4vw,26px)] font-extrabold">VERIFIED CREATORS ONLY</h3>
+            <h3 className="m-0 font-display text-[clamp(20px,2.4vw,26px)] font-extrabold">APPROVE ONCE, PAY PER AD</h3>
             <p className="m-0 max-w-[460px] text-[15px] leading-relaxed text-[#3E4148]">
-              Every creator proved they own their YouTube channel and passed a live face check (blink, turn) matched to the channel&apos;s avatar.
-              Their reference photos were captured live from the camera, never uploaded.
+              Set a mandate once (a per-render maximum, a daily cap, a total budget and a step-up threshold) and save your PayPal wallet once
+              with PayPal Vault. Each ad is authorized on that wallet, captured only after it renders and passes its check, and refunded if you
+              reject it.
             </p>
           </article>
           <div className="flex min-w-0 flex-[1_1_300px] flex-col gap-5">
-                        <article className={`rv${seen ? " in" : ""} flex flex-1 flex-col gap-1.5 rounded-[30px] bg-ink-line p-7 text-white`} style={{ transitionDelay: ".4s" }} title={MEASUREMENTS.rendersWithReceipt.source}>
+            <article className={`rv${seen ? " in" : ""} flex flex-1 flex-col gap-1.5 rounded-[30px] bg-ink-line p-7 text-white`} style={{ transitionDelay: ".4s" }} title={MEASUREMENTS.creatorShare.source}>
               <span className="tnum font-display text-[clamp(40px,5vw,52px)] font-black leading-none text-lime">{pct}%</span>
-              <span className="font-display text-[17px] font-bold leading-snug">OF RENDERS CARRY A SIGNED RECEIPT</span>
-              <span className="text-[13px] text-grey-dark">By design: every render is charged and its receipt signed by Cloud KMS in one step.</span>
+              <span className="font-display text-[17px] font-bold leading-snug">OF EVERY ACCEPTED AD GOES TO THE CREATOR</span>
+              <span className="text-[13px] text-grey-dark">Paid through PayPal Payouts when the brand accepts the ad, or at the review deadline.</span>
+            </article>
+            <article className={`rv${seen ? " in" : ""} flex flex-1 flex-col gap-1.5 rounded-[30px] bg-lime p-7 text-ink`} style={{ transitionDelay: ".55s" }} title={MEASUREMENTS.refusedPayPalCalls.source}>
+              <span className="tnum font-display text-[clamp(40px,5vw,52px)] font-black leading-none">{MEASUREMENTS.refusedPayPalCalls.value}</span>
+              <span className="font-display text-[17px] font-bold leading-snug">PAYPAL CALLS ON A REFUSED RENDER</span>
+              <span className="text-[13px] text-[#3E4148]">Revoked licence, cap or budget reached: refused in the policy check, before any money moves.</span>
             </article>
           </div>
         </div>
@@ -206,10 +200,22 @@ function Stats() {
 // ---------------------------------------------------------------- how it works
 
 const STEPS = [
-  { title: "PROVE IT'S YOU", body: "Connect your YouTube channel to show it's yours, then a quick live face check (blink, turn) matched to your channel avatar." },
-  { title: "SET YOUR TERMS", body: "Pick uses, a price per image and per video, and a cap. Political, adult, minor-involving, impersonating and deceptive uses are always refused." },
-  { title: "APPROVE BRANDS", body: "A brand requests a licence and you approve it. Your photos stay encrypted with your own key in Google Cloud KMS; only the render service can open them, and every access is logged." },
-  { title: "GET PAID, OR REVOKE", body: "Each image or video ad pays you per render, with a signed receipt and a content credential. Revoke and the next render is refused." },
+  {
+    title: "LICENCE ONCE",
+    body: "The creator approves a brand's request once: which uses (advertising, social, editorial, internal), how many renders, for how long, at the creator's price per render. Political, adult, minor-involving, impersonating and deceptive uses are always refused.",
+  },
+  {
+    title: "MANDATE ONCE",
+    body: "The brand sets its limits once (per render, per day, in total, and a step-up threshold above which it approves each render) and saves its PayPal wallet with PayPal Vault. Nothing is charged yet.",
+  },
+  {
+    title: "AUTHORIZE, RENDER, CAPTURE",
+    body: "Each ad is checked against the licence and the mandate in one database transaction, authorized on the saved wallet, rendered and checked, then captured. A failed render or check voids the authorization.",
+  },
+  {
+    title: "PAYOUT 90% OR REFUND",
+    body: "Accept pays the creator 90% through PayPal Payouts; reject refunds the brand. No answer by the deadline counts as accept. Every outcome gets an Ed25519-signed receipt anyone can check on Verify.",
+  },
 ];
 
 function HowItWorks() {
@@ -220,12 +226,12 @@ function HowItWorks() {
     <section id="how" className="scroll-mt-4 overflow-hidden bg-white">
       <div ref={ref} className="mx-auto flex max-w-[1180px] flex-col gap-12 px-4 py-24 sm:px-8">
         <h2 className="m-0 text-center font-display text-[clamp(28px,4vw,44px)] font-extrabold leading-[1.2] tracking-[-0.01em]">
-          <span className={`${c("from-l")} inline-block`}>FROM SELFIE</span>{" "}
+          <span className={`${c("from-l")} inline-block`}>FROM LICENCE</span>{" "}
           <span aria-hidden="true" className={`${c("pop")} inline-flex h-12 w-24 items-center gap-1 rounded-full bg-ink px-[5px] align-middle`}>
             <span className="h-[38px] w-[38px] rounded-full bg-lime" />
             <span className="h-[38px] w-[38px] rounded-full border-2 border-lime" />
           </span>{" "}
-          <span className={`${c("from-r")} inline-block`}>TO PAID RENDER</span>
+          <span className={`${c("from-r")} inline-block`}>TO PAID AD</span>
           <br />
           <span className={`${c("rv")} inline-block`}>IN FOUR STEPS</span>
         </h2>
@@ -259,8 +265,8 @@ function HowItWorks() {
           </ol>
           <div className={`${c("rv")} flex min-w-0 flex-[1_1_440px] flex-col gap-[18px]`} style={{ transitionDelay: ".3s" }}>
             <p className="m-0 text-[16px] leading-relaxed text-[#3E4148]">
-              Political, adult, minor-involving, impersonating and deceptive uses are refused under every licence, checked before every render. You choose everything else, and you can pull a licence back in one
-              click.
+              Revoke a licence and the brand&apos;s next render is refused before any PayPal call; ads already made stay &ldquo;licensed when made&rdquo;. Demo
+              renders are pre-generated images, so no AI model is called, but every PayPal call is a real sandbox call.
             </p>
             <div className="relative aspect-[5/4] overflow-hidden rounded-[28px] bg-[#25B6D2]">
               <Image src="/landing/portrait-cyan.png" alt="" fill sizes="(min-width: 1024px) 540px, 92vw" className="scale-[1.03] object-cover object-[50%_22%]" />
@@ -292,7 +298,7 @@ function HowItWorks() {
                   <span aria-hidden="true" className="relative h-7 w-7 shrink-0 overflow-hidden rounded-full">
                     <Image src="/landing/avatar-5.png" alt="" fill sizes="28px" className="scale-[1.06] object-cover" />
                   </span>
-                  <b className="font-semibold">Product licence</b>
+                  <b className="font-semibold">Editorial licence</b>
                   <span className="flex items-center gap-1.5 text-grey">
                     <span aria-hidden="true" className="h-2 w-2 rounded-full bg-bad" />
                     revoked
@@ -300,9 +306,7 @@ function HowItWorks() {
                 </span>
               </div>
             </div>
-            <Link href="/start" className={pillClass("ink", "min-h-[54px]")}>
-              Get started
-            </Link>
+            <ContinueAs role="brand" kind="ink" className="min-h-[54px] w-full" />
           </div>
         </div>
       </div>
@@ -313,8 +317,8 @@ function HowItWorks() {
 // ---------------------------------------------------------------- creators
 
 /**
- * Sample images only, never a real creator's face: each card is labelled Example and invites a creator.
- * Real creators are in the marketplace, with the photo they chose to publish there.
+ * Sample images only, never a real creator's face: each card is labelled Example and invites a creator. The demo
+ * workspace's creator, Rohit, is a drawn illustration.
  */
 const EXAMPLES = [
   { photo: "/landing/portrait-pink.png", frame: "/landing/card-violet.png" },
@@ -340,12 +344,12 @@ function Creators() {
       <div ref={ref} className="relative mx-auto grid max-w-[1120px] grid-cols-1 gap-8 px-4 pb-24 pt-20 sm:grid-cols-3 sm:gap-x-6 sm:gap-y-6 sm:px-8">
         <div className={`rv${seen ? " in" : ""} flex flex-wrap items-end gap-4 sm:col-span-2 sm:col-start-2 sm:row-start-1 sm:self-start sm:pl-6 sm:pt-8`}>
           <h2 className="m-0 font-display text-[clamp(26px,3.4vw,40px)] font-extrabold leading-[1.15]">
-            MEET THE{" "}
+            LICENSE YOUR{" "}
             <span aria-hidden="true" className="relative inline-block h-10 w-10 overflow-hidden rounded-full align-middle">
               <Image src="/landing/avatar-7.png" alt="" fill sizes="40px" className="scale-[1.06] object-cover" />
             </span>
             <br />
-            CREATORS
+            FACE
           </h2>
           <span className="flex gap-1 pb-1">
             <button
@@ -369,10 +373,9 @@ function Creators() {
         {shown.map((ex, i) => {
           const transform = seen ? `rotate(${TILTS[i]})` : "translateX(160px) rotate(8deg)";
           return (
-            <Link
+            <div
               key={ex.photo}
-              href="/start"
-              className={`card-in${seen ? " in" : ""} relative block self-start rounded-[28px] p-3 text-ink no-underline shadow-[0_18px_40px_rgba(18,19,22,0.12)] ${PLACE[i]}`}
+              className={`card-in${seen ? " in" : ""} relative block self-start rounded-[28px] p-3 text-ink shadow-[0_18px_40px_rgba(18,19,22,0.12)] ${PLACE[i]}`}
               style={{ transform, transitionDelay: `${0.1 + i * 0.18}s`, backgroundImage: `url(${ex.frame})`, backgroundSize: "cover" }}
             >
               <span className="absolute left-5 top-5 z-10 rounded-full bg-white px-3 py-1.5 font-display text-[11px] font-bold">EXAMPLE</span>
@@ -382,11 +385,11 @@ function Creators() {
               <div className="absolute bottom-6 left-6 right-6 flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-white px-3 py-2.5">
                 <span className="flex min-w-0 flex-col">
                   <span className="font-display text-[14px] font-bold">YOUR FACE HERE</span>
-                  <span className="text-[12px] text-grey">Verify once, get paid per render</span>
+                  <span className="text-[12px] text-grey">Licence once, paid per ad</span>
                 </span>
-                <span className={pillClass("ink", "min-h-9 px-3 text-[12px]")}>Become a creator</span>
+                <ContinueAs role="creator" kind="ink" className="min-h-11 px-3 text-[12px]" />
               </div>
-            </Link>
+            </div>
           );
         })}
       </div>
@@ -445,9 +448,9 @@ function Quotes() {
             <h2 className="m-0 font-display text-[clamp(18px,2.2vw,24px)] font-extrabold leading-[1.25]">
               LICENSE YOUR FACE TO AI.
               <br />
-              YOUR TERMS, PAID PER IMAGE.
+              PAID PER AD, THROUGH PAYPAL.
             </h2>
-            <span className="flex items-center gap-4">
+            <span className="flex flex-wrap items-center gap-4">
               <span aria-hidden="true" className="hidden sm:flex">
                 {[6, 8, 5].map((n, i) => (
                   <span key={n} className="relative h-11 w-11 overflow-hidden rounded-full border-[3px] border-white" style={{ marginLeft: i ? -12 : 0 }}>
@@ -455,12 +458,8 @@ function Quotes() {
                   </span>
                 ))}
               </span>
-              <Link href="/start" className={pillClass("outline-dark", "px-6 text-[14px]")}>
-                License a face
-              </Link>
-              <Link href="/start" className={pillClass("ink", "px-6 text-[14px]")}>
-                Get started
-              </Link>
+              <ContinueAs role="creator" kind="outline-dark" className="px-6 text-[14px]" />
+              <ContinueAs role="brand" kind="ink" className="px-6 text-[14px]" />
             </span>
           </div>
         </div>

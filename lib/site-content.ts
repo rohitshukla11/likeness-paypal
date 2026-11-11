@@ -1,13 +1,18 @@
 /**
- * Marketing copy that is data, not code. Every number here is a real measurement with its source;
+ * Marketing copy that is data, not code. Every number here is true by construction, with where it comes from;
  * testimonials are real quotes only. An empty list hides the section entirely.
  */
 
 export const MEASUREMENTS = {
-  /** By construction: a render is charged and its KMS-signed receipt stored in one Firestore transaction. */
-  rendersWithReceipt: {
-    value: 100,
-    source: "Every render is settled in one Firestore transaction that also stores its Cloud KMS-signed receipt",
+  /** lib/engine/render-and-pay.ts: Accept pays the creator 90% of the captured amount through PayPal Payouts. */
+  creatorShare: {
+    value: 90,
+    source: "On Accept (or at the review deadline) the engine pays the creator 90% of the capture through PayPal Payouts",
+  },
+  /** lib/engine/policy.ts: a refused render is decided in the policy transaction, before any PayPal call. */
+  refusedPayPalCalls: {
+    value: 0,
+    source: "A refused render (revoked licence, cap, budget, daily cap) is refused in the policy transaction, before any PayPal call",
   },
 } as const;
 
@@ -16,9 +21,4 @@ export type Testimonial = { quote: string; name: string; role: string };
 /** Real, attributed quotes only. Leave empty until there are some: the section is then not rendered. */
 export const TESTIMONIALS: Testimonial[] = [];
 
-/** The legal pages, on Firebase Hosting (hosting/ in the repo). */
-export const LEGAL_SITE = "https://bionic-carving-140911.firebaseapp.com";
-export const PRIVACY_URL = `${LEGAL_SITE}/privacy`;
-export const TERMS_URL = `${LEGAL_SITE}/terms`;
-
-export const BUILT_ON = ["Vertex AI Gemini", "Veo", "Firebase", "YouTube", "Cloud KMS", "Cloud Run", "C2PA"];
+export const BUILT_ON = ["PayPal Vault", "Orders v2", "Payouts", "JS SDK v6", "Neon Postgres", "Ed25519 receipts", "Next.js"];
