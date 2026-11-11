@@ -29,12 +29,6 @@ export const IconQuestion = ({ size, className, stroke = "currentColor" }: P) =>
   </svg>
 );
 
-export const IconArrowUpRight = ({ size, className, stroke = "currentColor" }: P) => (
-  <svg {...base(size)} className={className} stroke={stroke} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M7 17L17 7M8 7h9v9" />
-  </svg>
-);
-
 export const IconArrowRight = ({ size, className, stroke = "currentColor" }: P) => (
   <svg {...base(size)} className={className} stroke={stroke} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M5 12h14M13 6l6 6-6 6" />
@@ -63,12 +57,5 @@ export const IconShield = ({ size, className, stroke = "currentColor" }: P) => (
   <svg {...base(size)} className={className} stroke={stroke} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6z" />
     <path d="M9 12l2 2 4-4" />
-  </svg>
-);
-
-export const IconLock = ({ size, className, stroke = "currentColor" }: P) => (
-  <svg {...base(size)} className={className} stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="5" y="11" width="14" height="10" rx="2" />
-    <path d="M8 11V8a4 4 0 0 1 8 0v3" />
   </svg>
 );

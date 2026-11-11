@@ -22,7 +22,7 @@ export function Countdown({ deadline }: { deadline: string }) {
 
   const s = Math.ceil(left / 1000);
   return (
-    <span className="tnum text-xs font-semibold text-warn" aria-live="polite">
+    <span className="tnum text-[13px] font-semibold text-wait" aria-live="polite">
       {s > 0 ? `auto-accepts in ${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}` : "settling…"}
     </span>
   );

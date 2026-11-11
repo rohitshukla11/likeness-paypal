@@ -119,20 +119,24 @@ export function WalletButton() {
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <button
           onClick={start}
           disabled={state !== "ready" && state !== "error"}
-          className="inline-flex items-center gap-2 rounded-xl bg-[#ffc439] px-4 py-2.5 text-sm font-bold text-[#111] shadow-sm hover:brightness-95 disabled:opacity-50 cursor-pointer"
+          className="inline-flex min-h-11 cursor-pointer items-center gap-2 whitespace-nowrap rounded-full bg-[#ffc439] px-5 text-[15px] font-bold text-[#111] hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {state === "loading" ? "Loading PayPal…" : state === "busy" ? "Waiting for PayPal…" : "Save PayPal wallet"}
         </button>
-        <button onClick={redirectFallback} disabled={state === "busy"} className="text-sm font-medium text-brand underline disabled:opacity-50 cursor-pointer">
+        <button onClick={redirectFallback} disabled={state === "busy"} className="min-h-11 cursor-pointer text-[14px] font-semibold text-ink underline disabled:opacity-50">
           or approve on the PayPal page
         </button>
       </div>
-      {message && <p className={`text-xs ${state === "error" ? "text-bad" : "text-muted"}`}>{message}</p>}
-      <p className="text-xs text-muted">Sandbox: log in with a sandbox personal (buyer) account. Nothing is charged now.</p>
+      {message && (
+        <p role={state === "error" ? "alert" : "status"} className={`m-0 text-[13px] ${state === "error" ? "text-bad" : ""}`}>
+          {message}
+        </p>
+      )}
+      <p className="m-0 text-[13px]">Sandbox: log in with a sandbox personal (buyer) account. Nothing is charged now.</p>
     </div>
   );
 }

@@ -6,10 +6,11 @@
  * licensee, the PayPal capture and payout or refund behind the answer, and the receipt's Ed25519 signature check.
  */
 import { useState } from "react";
+import { AppPage, btnClass, Card, ErrorCard } from "@/components/ds";
+import { IconUpload } from "@/components/ds/icons";
+import { inputClass } from "@/components/ui";
 import type { VerifyResult } from "@/lib/verify";
 import { Result } from "./result";
-
-const inputClass = "w-full min-w-0 rounded-xl border border-line bg-white px-3 py-2 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20";
 
 async function sha256Hex(f: File) {
   const d = await crypto.subtle.digest("SHA-256", await f.arrayBuffer());
@@ -51,66 +52,71 @@ export default function VerifyPage() {
   }
 
   return (
-    <div className="flex flex-col gap-5">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Verify an ad</h1>
-        <p className="mt-1 max-w-2xl text-sm text-muted">Was the person in this ad paid and did they license it? Anyone can check; no account needed.</p>
-      </div>
-      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)]">
-        <div className="flex min-w-0 flex-col gap-3">
-          <label
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={(e) => {
-              e.preventDefault();
-              void onFile(e.dataTransfer.files[0]);
-            }}
-            className="flex min-h-16 cursor-pointer items-center gap-3 rounded-2xl border-2 border-dashed border-line bg-white px-4 text-sm font-semibold focus-within:outline focus-within:outline-2 focus-within:outline-brand"
-          >
-            <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-brand">
-              ↑
-            </span>
-            <span className="flex-1">{busy ? "Checking…" : "Drop a file or choose one"}</span>
-            <input type="file" className="sr-only" onChange={(e) => void onFile(e.target.files?.[0])} />
-          </label>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              void lookUp(query);
-            }}
-            className="flex flex-col gap-2 text-sm"
-          >
-            <label htmlFor="q" className="text-muted">
-              or a receipt id (rcp_…) or the file&apos;s sha256
+    <AppPage title="Verify an ad" description="Was the person in this ad paid, and did they license it? Anyone can check; no account needed. Files are hashed in your browser, never uploaded.">
+      <div className="grid grid-cols-1 items-start gap-[18px] desk:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)]">
+        <div className="flex min-w-0 flex-col gap-[18px]">
+          <Card>
+            <label
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault();
+                void onFile(e.dataTransfer.files[0]);
+              }}
+              className="flex min-h-16 cursor-pointer items-center gap-3 rounded-[16px] border-2 border-dashed border-field bg-paper px-4 text-[15px] font-semibold focus-within:outline focus-within:outline-[3px] focus-within:outline-violet"
+            >
+              <span aria-hidden="true" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-lime text-ink">
+                <IconUpload size={20} />
+              </span>
+              <span className="flex-1">{busy ? "Checking…" : "Drop a file or choose one"}</span>
+              <input type="file" className="sr-only" onChange={(e) => void onFile(e.target.files?.[0])} />
             </label>
-            <div className="flex gap-2">
-              <input id="q" className={`${inputClass} font-mono text-xs`} placeholder="rcp_… or 64 hex characters" value={query} onChange={(e) => setQuery(e.target.value)} />
-              <button type="submit" disabled={busy || !query.trim()} className="rounded-xl bg-ink px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 cursor-pointer">
-                Look up
-              </button>
-            </div>
-          </form>
-          <figure className="m-0 flex flex-col gap-2 rounded-2xl border border-line bg-white p-3">
-            {file ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={file.url} alt="The checked file" className="max-h-[480px] w-full rounded-xl bg-paper object-contain" />
-            ) : (
-              <div className="flex aspect-[4/3] items-center justify-center rounded-xl bg-paper p-4 text-center text-sm text-muted">The file you check appears here. It is hashed in your browser; nothing is uploaded.</div>
-            )}
-            {file && <figcaption className="break-all font-mono text-xs text-muted">sha256 {file.sha}</figcaption>}
-          </figure>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                void lookUp(query);
+              }}
+              className="flex flex-col gap-1.5"
+            >
+              <label htmlFor="q" className="text-[14px] font-medium text-grey">
+                or a receipt id (rcp_…) or the file&apos;s sha256
+              </label>
+              <div className="flex gap-2">
+                <input id="q" className={`${inputClass} font-mono text-[13px]`} placeholder="rcp_… or 64 hex characters" value={query} onChange={(e) => setQuery(e.target.value)} />
+                <button type="submit" disabled={busy || !query.trim()} className={btnClass("ink", "cursor-pointer")}>
+                  Look up
+                </button>
+              </div>
+            </form>
+          </Card>
+          <Card as="div">
+            <figure className="m-0 flex flex-col gap-2">
+              {file ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={file.url} alt="The checked file" className="max-h-[480px] w-full rounded-[12px] bg-paper object-contain" />
+              ) : (
+                <div className="flex aspect-[4/3] items-center justify-center rounded-[12px] bg-paper p-4 text-center text-[14px] text-grey">
+                  The file you check appears here. It is hashed in your browser; nothing is uploaded.
+                </div>
+              )}
+              {file && <figcaption className="break-all font-mono text-[12px] text-grey">sha256 {file.sha}</figcaption>}
+            </figure>
+          </Card>
         </div>
-        <div className="min-w-0">
-          {error && <p className="mb-3 rounded-xl bg-bad-soft px-4 py-3 text-sm text-bad">{error}</p>}
+        <div className="flex min-w-0 flex-col gap-[18px]">
+          {error && <ErrorCard>{error}</ErrorCard>}
           {result ? (
             <Result result={result} />
           ) : (
-            <p className="rounded-2xl border border-line bg-white p-4 text-sm text-muted">
-              Every ad made through Likeness has a receipt signed with Ed25519 that names its licence and the PayPal capture, payout or refund behind it.
-              Edited or re-encoded copies come back Unknown.
-            </p>
+            <Card title="What you get">
+              <p className="m-0 text-[14px] text-grey">
+                Every ad made through Likeness has a receipt signed with Ed25519 that names its licence and the PayPal order, authorization, capture and
+                payout or refund behind it. The verdict is Licensed, Revoked (licensed when made), Expired, Refunded or Unknown. Edited or re-encoded
+                copies come back Unknown.
+              </p>
+            </Card>
           )}
         </div>
       </div>
-    </div>
+    </AppPage>
   );
 }

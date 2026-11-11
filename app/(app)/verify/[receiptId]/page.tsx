@@ -1,23 +1,34 @@
 import Link from "next/link";
 import { connection } from "next/server";
 import { Suspense } from "react";
+import { AppPage, btnClass, Skeleton } from "@/components/ds";
 import { verifyReceipt } from "@/lib/verify";
 import { Result } from "../result";
 
 /** A receipt's own page: shareable proof that an ad was licensed and paid (or refunded, revoked, expired). */
 export default function ReceiptPage(props: PageProps<"/verify/[receiptId]">) {
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-end justify-between gap-2">
-        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Receipt</h1>
-        <Link href="/verify" className="text-sm font-semibold text-brand underline">
+    <AppPage
+      title="Receipt"
+      description="An Ed25519-signed receipt: the licence and the PayPal payments behind one ad."
+      actions={
+        <Link href="/verify" className={btnClass("outline")}>
           Check another ad
         </Link>
-      </div>
-      <Suspense fallback={<p className="text-sm text-muted">Checking the receipt…</p>}>
+      }
+    >
+      <Suspense
+        fallback={
+          <div role="status" aria-label="Checking the receipt" className="flex flex-col gap-[18px]">
+            <Skeleton className="h-24" />
+            <Skeleton className="h-64" />
+            <span className="sr-only">Checking the receipt…</span>
+          </div>
+        }
+      >
         <Receipt {...props} />
       </Suspense>
-    </div>
+    </AppPage>
   );
 }
 

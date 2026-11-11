@@ -1,14 +1,18 @@
 import Link from "next/link";
-import { btn, Card } from "@/app/ui";
+import { btnClass, NoticePage } from "@/components/ds";
 
 export default function VaultCancel() {
   return (
-    <Card className="mx-auto max-w-lg text-center">
-      <div className="flex flex-col items-center gap-3 py-4">
-        <h1 className="text-xl font-bold">Wallet not saved</h1>
-        <p className="text-sm text-muted">You cancelled at PayPal. Nothing was saved and nothing was charged.</p>
-        <Link href="/brand" className={btn.ghost}>Back to brand</Link>
-      </div>
-    </Card>
+    <NoticePage
+      title="Wallet not saved"
+      description="PayPal wallet"
+      action={
+        <Link href="/brand" className={btnClass("ink")}>
+          Back to brand
+        </Link>
+      }
+    >
+      You cancelled at PayPal. Nothing was saved and nothing was charged.
+    </NoticePage>
   );
 }

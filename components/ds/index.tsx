@@ -98,10 +98,6 @@ export function StatusPill({ kind, children, title }: { kind: PillKind; children
   );
 }
 
-export function TagChip({ children }: { children: ReactNode }) {
-  return <span className="inline-flex items-center rounded-full bg-paper px-2.5 py-1 text-[12px] font-medium text-ink">{children}</span>;
-}
-
 // ---------------------------------------------------------------- page structure
 
 /**
@@ -215,16 +211,6 @@ export function StatCard({ label, value, note }: { label: string; value: ReactNo
 /** Loading shapes in the card style. No numbers until they are real. */
 export function Skeleton({ className = "h-24" }: { className?: string }) {
   return <span aria-hidden="true" className={`block animate-pulse rounded-[20px] bg-white motion-reduce:animate-none ${className}`} />;
-}
-
-export function EmptyState({ title, children, action }: { title: string; children?: ReactNode; action?: ReactNode }) {
-  return (
-    <div className="flex flex-col items-start gap-2 rounded-[20px] bg-white p-[18px] sm:px-5">
-      <h2 className="m-0 text-[17px] font-semibold">{title}</h2>
-      {children && <div className="text-[14px] text-grey">{children}</div>}
-      {action && <div className="pt-1">{action}</div>}
-    </div>
-  );
 }
 
 /** An error, in plain words, with one way forward. */

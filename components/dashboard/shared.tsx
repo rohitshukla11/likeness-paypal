@@ -1,79 +1,81 @@
-"use client";
-import { useCallback, useEffect, useState } from "react";
-import { api, reason } from "@/lib/client/firebase";
-import type { LicenceDoc, LicenceStatus, RequestDoc } from "@/lib/model";
+/**
+ * Render rows, their labels and the money and PayPal-id formatting shared by the Studio, the Brand and Creator pages
+ * and the receipts. Server-safe (no hooks): the server pages read the rows and pass them in.
+ */
+import type { ReactNode } from "react";
+import type { PillKind } from "@/components/ds";
+import type { renders } from "@/lib/db/schema";
 
-export type LicenceRow = LicenceDoc & { status: LicenceStatus };
-export type Render = {
-  id: string;
-  licenceId: string;
-  brandId: string;
-  creatorId: string;
-  type: "image" | "video";
-  renderIndex: number;
-  sha256: string;
-  mime: string;
-  model: string;
-  price: number;
-  creatorShare: number;
-  fee: number;
-  brief: string;
-  createdAt: number;
-  pipeline?: "veo-3.1-lite" | "ffmpeg-fallback";
-  pipelineNote?: string;
-  fromRenderId?: string;
-  aspect?: "1:1" | "16:9" | "9:16";
-  hasPreview?: boolean;
-  /** An unlabelled still is kept, so a video ad can animate it (image ads from before Phase 2 have none). */
-  hasRaw?: boolean;
-  /** Video only: the quality gate (see lib/server/gate.ts), resolution, and how the still was framed. */
-  gate?: GateSummary;
-  resolution?: "720p" | "1080p";
-  framing?: string;
-  creatorName: string;
-  brandName: string;
-  use: string;
+export type Render = typeof renders.$inferSelect;
+
+export const usd = (cents: number) => `$${(cents / 100).toFixed(2)}`;
+
+/** A PayPal or app id, shortened for a card (the full id stays in the title and for screen readers). */
+export const short = (id: string | null | undefined) => (!id ? "–" : id.length <= 14 ? id : `${id.slice(0, 7)}…${id.slice(-4)}`);
+
+export const when = (d: Date | null | undefined) =>
+  d ? `${d.toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "UTC" })} UTC` : "–";
+
+/** Render statuses (lib/db/schema.ts) in words. */
+export const STATUS_LABEL: Record<string, string> = {
+  needs_brand_approval: "Needs your approval",
+  authorized: "Authorized",
+  rendering: "Rendering…",
+  captured: "Captured",
+  in_review: "In review",
+  settling: "Paying out…",
+  accepted: "Accepted · creator paid",
+  refunding: "Refunding…",
+  rejected: "Rejected · refunded",
+  voided: "Voided",
+  refused: "Refused",
+  failed: "Failed",
 };
 
-type GateCheck = { passed: boolean; frames: number; visible: number; matched: number; need: number; threshold: number; medianSimilarity: number | null; minSimilarity: number | null; reason: string };
-export type GateSummary = GateCheck & { attempts: GateCheck[]; outcome: string };
+/** The same statuses as the creator sees them. */
+export const CREATOR_LABEL: Record<string, string> = { ...STATUS_LABEL, needs_brand_approval: "Waiting for the brand", accepted: "Accepted · paid to you", rejected: "Rejected · refunded" };
 
-export function gateLine(g: GateSummary): string {
-  const sim = g.medianSimilarity === null ? "" : `, median match ${g.medianSimilarity.toFixed(2)} (threshold ${g.threshold})`;
-  const head = g.outcome === "passed" || g.outcome === "passed on retry" ? `Quality gate ${g.outcome}` : `Quality gate: ${g.outcome}`;
-  return `${head}: face fully visible in ${g.visible}/${g.frames} frames, matches the creator in ${g.matched}/${g.frames}${sim}.`;
+export function renderPill(status: string): PillKind {
+  if (status === "accepted") return "licensed";
+  if (["rejected", "voided", "refused", "failed"].includes(status)) return "revoked";
+  if (["in_review", "needs_brand_approval", "settling", "refunding", "authorized", "rendering", "captured"].includes(status)) return "waiting";
+  return "neutral";
 }
 
-export const pipelineLabel = (r: Pick<Render, "type" | "pipeline" | "model">) =>
-  r.type === "image" ? `Gemini (${r.model})` : r.pipeline === "veo-3.1-lite" ? "Veo 3.1 Lite" : "Free fallback motion ad (ffmpeg)";
-export type Lists = {
-  asCreator: { requests: RequestDoc[]; licences: LicenceRow[] };
-  asBrand: { requests: RequestDoc[]; licences: LicenceRow[] };
-};
+/** Pre-generated demo renders say so; a real provider would name its model. */
+export const pipelineLabel = (r: Pick<Render, "model">) => r.model ?? "no output";
 
-/** Load a JSON endpoint and reload on demand. */
-export function useApi<T>(url: string | null) {
-  const [data, setData] = useState<T | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const load = useCallback(async () => {
-    if (!url) return;
-    try {
-      setData(await api<T>(url));
-      setError(null);
-    } catch (e) {
-      setError(reason(e));
-    }
-  }, [url]);
-  useEffect(() => {
-    void load();
-  }, [load]);
-  return { data, error, reload: load };
+/** A PayPal id: shortened, monospaced, the full id on hover and for screen readers. */
+export function PayPalId({ id }: { id: string | null | undefined }) {
+  if (!id) return <span className="text-grey">–</span>;
+  return (
+    <span title={id} className="break-all font-mono text-[12px]">
+      <span aria-hidden="true">{short(id)}</span>
+      <span className="sr-only">{id}</span>
+    </span>
+  );
 }
 
-/** Open a render through a short-lived signed URL. */
-export async function openRender(id: string) {
-  const r = await api<{ url: string }>(`/api/renders/${id}/url`);
-  window.open(r.url, "_blank", "noopener");
+/** The PayPal side of one render: order, authorization, capture, then the payout or the refund. */
+export function PayPalIds({ r, payoutNote }: { r: Pick<Render, "orderId" | "authorizationId" | "captureId" | "payoutBatchId" | "refundId">; payoutNote?: ReactNode }) {
+  const rows: [string, string | null, ReactNode?][] = [
+    ["PayPal order", r.orderId],
+    ["Authorization", r.authorizationId],
+    ["Capture", r.captureId],
+  ];
+  if (r.payoutBatchId) rows.push(["Payout batch", r.payoutBatchId, payoutNote]);
+  if (r.refundId) rows.push(["Refund", r.refundId]);
+  return (
+    <dl className="m-0 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-0.5 text-[13px]">
+      {rows.map(([k, v, note]) => (
+        <div key={k} className="contents">
+          <dt className="text-grey">{k}</dt>
+          <dd className="m-0 min-w-0">
+            <PayPalId id={v} />
+            {note && <span className="text-grey"> {note}</span>}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
 }
-
-export const when = (ms: number) => new Date(ms).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });

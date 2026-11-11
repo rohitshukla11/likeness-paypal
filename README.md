@@ -68,7 +68,8 @@ starts a new workspace and deletes nothing.
 | `lib/paypal/` | PayPal REST client (plain fetch): OAuth, Vault v3, Orders v2, Payments v2, Payouts v1, the browser-safe client token |
 | `lib/db/` | Drizzle schema and client (Neon Postgres, Pool driver for transactions) |
 | `lib/licences.ts`, `lib/receipts.ts`, `lib/verify.ts`, `lib/wallet.ts` | licences, Ed25519 receipts, verification, wallet saving |
-| `app/` | landing, `/brand`, `/brand/studio`, `/creator`, `/verify`, the PayPal vault return route, API routes |
+| `app/` | landing, and in the `(app)` route group `/brand`, `/brand/studio`, `/creator`, `/verify` and the PayPal vault return route; API routes |
+| `components/`, `public/landing/` | the UI from likeness-ai: design system (`ds/`), header and footer, landing page, render card (see `docs/HACKATHON.md`) |
 | `tests/`, `scripts/` | unit tests and sandbox scripts |
 | `docs/HACKATHON.md` | what's new for the hackathon and what was reused |
 | `docs/DEPLOY.md` | research: Render Workflows for the render steps |

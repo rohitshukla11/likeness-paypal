@@ -1,18 +1,29 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
+import { AppPage, btnClass, Card, ErrorCard, Skeleton, StatusPill } from "@/components/ds";
+import { IconCheck } from "@/components/ds/icons";
+import { PayPalId } from "@/components/dashboard/shared";
 import { HttpError } from "@/lib/errors";
 import { PayPalError } from "@/lib/paypal/http";
 import { getSession } from "@/lib/session";
 import { completeWalletSetup } from "@/lib/wallet";
-import { btn, Card, short } from "@/app/ui";
 
 /** PayPal sends the brand back here after approving the wallet (redirect flow); the SDK flow lands here too. */
 export default function VaultReturn(props: PageProps<"/paypal/vault/return">) {
   return (
-    <Suspense fallback={<p className="text-sm text-muted">Saving your PayPal wallet…</p>}>
-      <Saved {...props} />
-    </Suspense>
+    <AppPage title="PayPal wallet" narrow>
+      <Suspense
+        fallback={
+          <div role="status" aria-label="Saving your PayPal wallet">
+            <Skeleton className="h-48" />
+            <span className="sr-only">Saving your PayPal wallet…</span>
+          </div>
+        }
+      >
+        <Saved {...props} />
+      </Suspense>
+    </AppPage>
   );
 }
 
@@ -28,28 +39,42 @@ async function Saved({ searchParams }: PageProps<"/paypal/vault/return">) {
   } catch (e) {
     result = { ok: false, error: e instanceof HttpError ? e.message : e instanceof PayPalError ? e.toString() : "Could not save the wallet" };
   }
+  if (!result.ok)
+    return (
+      <>
+        <h2 className="m-0 text-[20px] font-bold">The wallet wasn&apos;t saved</h2>
+        <ErrorCard
+          action={
+            <Link href="/brand" className={btnClass("outline")}>
+              Back to brand
+            </Link>
+          }
+        >
+          {result.error}
+        </ErrorCard>
+      </>
+    );
   return (
-    <Card className="mx-auto max-w-lg text-center">
-      {result.ok ? (
-        <div className="flex flex-col items-center gap-3 py-4">
-          <span aria-hidden="true" className="flex h-14 w-14 items-center justify-center rounded-full bg-good-soft text-2xl text-good">✓</span>
-          <h1 className="text-2xl font-bold">Wallet saved ✓</h1>
-          <p className="text-sm text-muted">
-            {result.email ?? "Your PayPal account"} is saved for pay-per-render (vault id {short(result.id)}). Each licensed ad is authorized on it, and captured only
-            when it renders and passes its checks.
-          </p>
-          <div className="flex gap-2">
-            <Link href="/brand" className={btn.ghost}>Back to brand</Link>
-            <Link href="/brand/studio" className={btn.primary}>Open Studio</Link>
-          </div>
-        </div>
-      ) : (
-        <div className="flex flex-col items-center gap-3 py-4">
-          <h1 className="text-xl font-bold">The wallet wasn&apos;t saved</h1>
-          <p className="text-sm text-bad">{result.error}</p>
-          <Link href="/brand" className={btn.ghost}>Back to brand</Link>
-        </div>
-      )}
+    <Card tone="lime">
+      <span aria-hidden="true" className="flex h-14 w-14 items-center justify-center rounded-full bg-ink text-lime">
+        <IconCheck size={28} />
+      </span>
+      <h2 className="m-0 text-[24px] font-bold">Wallet saved ✓</h2>
+      <p className="m-0 text-[15px]">
+        {result.email ?? "Your PayPal account"} is saved for pay-per-render. Each licensed ad is authorized on it, and captured only when it renders and
+        passes its checks.
+      </p>
+      <p className="m-0 flex flex-wrap items-center gap-2 text-[14px]">
+        <StatusPill kind="lime">Saved</StatusPill> Vault id <PayPalId id={result.id} />
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <Link href="/brand/studio" className={btnClass("ink")}>
+          Open Studio
+        </Link>
+        <Link href="/brand" className={btnClass("outline-dark")}>
+          Back to brand
+        </Link>
+      </div>
     </Card>
   );
 }

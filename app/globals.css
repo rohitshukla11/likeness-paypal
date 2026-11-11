@@ -55,14 +55,6 @@
   --color-warn: #6538c4;
   --color-blue: #6538c4;
 
-  /* This app's first token names (app/ui.tsx), mapped the same way until every page uses components/ds. */
-  --color-brand: #6d3fe0;
-  --color-brand-soft: #ede5ff;
-  --color-good: #3b6e25;
-  --color-good-soft: #eaf7e4;
-  --color-warn-soft: #f1eafe;
-  --color-bad-soft: #fceaea;
-
   /* layout: app pages stack into one column below 900 px */
   --breakpoint-desk: 56.25rem;
 

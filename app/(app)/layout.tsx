@@ -13,7 +13,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </Suspense>
       </div>
       <main id="main" className="flex-1 text-ink">
-        <div className="mx-auto w-full max-w-[1320px] px-4 pb-12 pt-6 sm:px-8">{children}</div>
+        {children}
       </main>
     </div>
   );
