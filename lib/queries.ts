@@ -38,7 +38,8 @@ export async function brandView(brandId: string) {
   const [mandate] = await db().select().from(mandates).where(eq(mandates.brandId, brandId)).orderBy(desc(mandates.createdAt)).limit(1);
   const [wallet] = brand?.paymentTokenId ? await db().select().from(paypalVaultTokens).where(eq(paypalVaultTokens.paymentTokenId, brand.paymentTokenId)) : [];
   const ws = brand?.workspaceId;
-  const workspaceCreators = ws ? await db().select().from(creators).where(eq(creators.workspaceId, ws)) : [];
+  // Live creators only: a draft from creator onboarding isn't offered to brands until it goes live.
+  const workspaceCreators = ws ? await db().select().from(creators).where(and(eq(creators.workspaceId, ws), eq(creators.status, "live"))) : [];
   const brandLicences = await listFor("brandId", brandId);
   let spentToday = 0;
   if (mandate) {

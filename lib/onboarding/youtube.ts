@@ -5,7 +5,7 @@ import "server-only";
  * subscriberCount is rounded by YouTube to three significant figures; hiddenSubscriberCount hides it.
  */
 import type { Channel } from "@/lib/model";
-import { HttpError } from "./http";
+import { HttpError } from "../errors";
 
 type ChannelsList = {
   items?: {

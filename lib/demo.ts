@@ -4,7 +4,7 @@ import "server-only";
  * brand), so judges never see each other's licences or renders. "Reset demo" starts a new workspace; the old one is
  * left in place, nothing is deleted.
  */
-import { eq } from "drizzle-orm";
+import { and, desc, eq, isNotNull } from "drizzle-orm";
 import { db } from "./db";
 import { brands, creators, workspaces } from "./db/schema";
 import { newId } from "./errors";
@@ -39,7 +39,15 @@ export async function createWorkspace(opts: { creatorEmail?: string | null; bran
 }
 
 export async function getWorkspace(id: string): Promise<Workspace | null> {
-  const [c] = await db().select({ id: creators.id }).from(creators).where(eq(creators.workspaceId, id)).limit(1);
+  // A live onboarded creator (FEATURE_CREATOR_ONBOARDING) takes over the creator persona; else the seeded one.
+  const [onboarded] = await db()
+    .select({ id: creators.id })
+    .from(creators)
+    .where(and(eq(creators.workspaceId, id), isNotNull(creators.googleSub), eq(creators.status, "live")))
+    .orderBy(desc(creators.createdAt))
+    .limit(1);
+  const [seeded] = onboarded ? [onboarded] : await db().select({ id: creators.id }).from(creators).where(eq(creators.workspaceId, id)).orderBy(creators.createdAt).limit(1);
+  const c = seeded;
   const [b] = await db().select({ id: brands.id }).from(brands).where(eq(brands.workspaceId, id)).limit(1);
   return c && b ? { id, creatorId: c.id, brandId: b.id } : null;
 }

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
+import { onboardingEnabled } from "@/lib/onboarding/google";
 import { AppPage, btnClass, Card, CreatorFace, Initial, StatCard, StatusPill } from "@/components/ds";
 import { CREATOR_LABEL, PayPalId, renderPill, usd, when } from "@/components/dashboard/shared";
 import { chipClass, Field, fmtDay, inputClass, StatusBadge } from "@/components/ui";
@@ -31,6 +32,13 @@ async function Creator({ searchParams }: PageProps<"/creator">) {
     <AppPage
       title={`Hi ${c.name}`}
       description="You approve each brand once, within your terms. Every ad made under a licence is paid to your PayPal (90%) when the brand accepts it, and comes with a signed receipt."
+      actions={
+        onboardingEnabled() && !c.googleSub ? (
+          <Link href="/creator/onboard" className={btnClass("ink")}>
+            Verify your own likeness
+          </Link>
+        ) : undefined
+      }
     >
       <Notice ok={q.ok} error={q.error} />
 

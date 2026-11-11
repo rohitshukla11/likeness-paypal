@@ -43,7 +43,7 @@ export async function fileRequest(brandId: string, input: { creatorId: string; u
   const [brand] = await db().select().from(brands).where(eq(brands.id, brandId));
   if (!brand) throw new HttpError(409, "set up your brand first");
   const [c] = await db().select().from(creators).where(eq(creators.id, input.creatorId));
-  if (!c || !c.acceptingLicences || c.workspaceId !== brand.workspaceId) throw new HttpError(404, "this creator isn't accepting licences");
+  if (!c || c.status !== "live" || !c.acceptingLicences || c.workspaceId !== brand.workspaceId) throw new HttpError(404, "this creator isn't accepting licences");
   const uses = [...new Set((input.uses ?? []).map(String))];
   if (!uses.length) throw new HttpError(400, "choose at least one use");
   const banned = uses.filter((u) => (BANNED_USES as readonly string[]).includes(u));

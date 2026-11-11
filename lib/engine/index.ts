@@ -26,7 +26,7 @@ export function providerFromEnv(env: NodeJS.ProcessEnv = process.env): RenderPro
   return new AiProvider({
     quota: new DrizzleQuota(),
     stub,
-    references: (i) => referencePhotos(i.creatorPhotoRef),
+    references: (i) => referencePhotos(i.creatorPhotoRef, { renderId: i.renderId, licenceId: i.licenceId }),
     demoClip,
     video: (i, still) => imageToVideo({ image: still.bytes, mime: still.mime, prompt: veoPrompt(i.prompt, "9:16"), aspectRatio: "9:16" }),
     credential: c2paConfigured()
