@@ -2,7 +2,7 @@
 # values when the Blueprint is created; nothing secret is in this file. See docs/DEPLOY.md for every variable.
 services:
   - type: web
-    name: likeness-paypal
+    name: likeness
     runtime: node
     plan: starter
     region: virginia

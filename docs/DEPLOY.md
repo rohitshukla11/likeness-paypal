@@ -32,7 +32,7 @@ Neon Postgres. Nothing is stored on Render's disk, which is ephemeral.
 | `PAYPAL_SANDBOX_CREATOR_EMAIL` | secret | the sandbox personal account that receives payouts |
 | `DEMO_VAULT_ID` | secret | the shared sandbox wallet behind "Use demo wallet" (same as local) |
 | `PAYPAL_WEBHOOK_ID` | secret | from `pnpm paypal:webhook --confirm` (step 4) |
-| `APP_BASE_URL` | e.g. `https://likeness-paypal.onrender.com` | PayPal return URLs, receipts, C2PA |
+| `APP_BASE_URL` | e.g. `https://likeness.onrender.com` | PayPal return URLs, receipts, C2PA |
 | `DATABASE_URL` | secret | the Neon connection string (same as local) |
 | `RECEIPT_SIGNING_KEY` | secret, **the SAME as local** | receipts signed locally must keep verifying |
 | `PHOTO_KEK` | secret, **the SAME as local** | opens the sealed reference photo from `seed:assets` |

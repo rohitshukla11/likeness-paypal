@@ -4,7 +4,7 @@
  * waits for PayPal's webhooks for that run's captures, refunds and payouts to arrive verified.
  * Needs E2E_TOKEN (the same value as on the server). Prints truncated ids only.
  *
- *   pnpm e2e:live --url https://<app>.onrender.com
+ *   pnpm e2e:live --url https://likeness.onrender.com
  */
 const base = (process.argv[process.argv.indexOf("--url") + 1] ?? process.env.APP_BASE_URL ?? "").replace(/\/$/, "");
 const token = process.env.E2E_TOKEN ?? "";

@@ -4,7 +4,7 @@
  * the webhook (or reuses one already pointing at that URL) and writes PAYPAL_WEBHOOK_ID to .env.local; set the
  * same value in Render. Prints truncated ids only.
  *
- *   pnpm paypal:webhook --url https://<app>.onrender.com [--confirm]
+ *   pnpm paypal:webhook --url https://likeness.onrender.com [--confirm]
  */
 import { readFile, writeFile } from "node:fs/promises";
 import { paypalConfig } from "../lib/paypal/http";
