@@ -68,7 +68,12 @@ export async function runEngineE2E(vaultId: string, label = "e2e"): Promise<E2ER
   const dDeps = engineDeps({ provider: new StubProvider(), reviewWindowSeconds: 3 });
   const d = await renderAndPay({ ...base, renderId: newId("rnd"), prompt: "Headphones ad, studio" }, dDeps);
   await sleep(3500);
-  const settled = (await settle(dDeps)).find((x) => x.id === d.id) ?? (await dDeps.store.getRender(d.id))!;
+  // On a deployed server the settle loop may claim the render first; either way it must end accepted and paid.
+  let settled = (await settle(dDeps)).find((x) => x.id === d.id) ?? (await dDeps.store.getRender(d.id))!;
+  for (let i = 0; i < 30 && settled.status !== "accepted"; i++) {
+    await sleep(1000);
+    settled = (await dDeps.store.getRender(d.id))!;
+  }
   paths.push({ path: "deadline", ok: settled.status === "accepted" && settled.decision === "auto_accept", status: settled.status, ids: ids(settled), detail: `decision ${settled.decision ?? "-"}` });
 
   await revoke(ws.creatorId, lic.id);
