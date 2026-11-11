@@ -1,444 +1,236 @@
-"use client";
-
 /**
- * The brand's workspace. The brand sets a brief, usage, duration, a budget and criteria; its agent shortlists creators
- * (with their faces and one line of why for each), sends requests and makes each ad, which stays unreleased until the
- * creator approves that exact ad in FaceVisa; then the agent pays and releases it on its own.
- * "Agents negotiate. Only the human consents to their face being used."
+ * The brand's dashboard, in the layout of likeness-eth (FaceVisa)'s BrandAgentConsole: a banner with the brand's
+ * monogram and status chips, the numbers, the one-time setup (lime: the PayPal wallet and the mandate), licences, and
+ * the spend table with PayPal ids. Server component; the Save PayPal wallet button is the one client island.
+ * FaceVisa's chain parts (wallet connect, tokens, gas, tx hashes, World ID, Arkiv) are replaced by PayPal Vault and ids.
  */
 import Link from "next/link";
-import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { btnClass, ErrorCard, Page, StatusPill } from "@/components/ds";
-import { Field, inputClass } from "@/components/ui";
-import type { Me } from "@/lib/api";
-import { getJson, postJson, STATUS, when, type AgentEvent, type BrandRequest, type DataSource, type Kind, type LicenceView, type Meta, type ShortlistEntry } from "@/lib/facevisa";
-import { ItemSource, SourceLabel } from "./SourceLabel";
-import { CreatorStatsRow } from "./CreatorStatsRow";
-import { MediaTile } from "./ReceiptTile";
-import { PaymentLine } from "./PaymentLine";
-import { SlowStep } from "./SlowStep";
-import { PresenceCard } from "./PresenceCard";
-import { CreatorFace } from "./CreatorFace";
-import { useAuth } from "@/components/site/Auth";
-import { acceptedLabel, PresenceBadge } from "./PresenceBadge";
+import { attachDemoWallet, requestLicence, saveMandate } from "@/app/(app)/brand/actions";
+import { WalletButton } from "@/app/(app)/brand/wallet-button";
+import { btnClass, CreatorFace, StatusPill } from "@/components/ds";
+import { PayPalId, renderPill, STATUS_LABEL, usd, when } from "@/components/dashboard/shared";
+import { chipClass, Field, fmtDay, inputClass, StatusBadge } from "@/components/ui";
+import type { brandRenders, brandView } from "@/lib/queries";
+import { Banner, CHIP, Empty, Fact, MUTED, Monogram, OUTLINE, Panel, Stat, StatsRow, SURFACE } from "./kit";
 
-type Activity = { events: AgentEvent[]; requests: BrandRequest[]; licences: LicenceView[]; spentToday: string };
+type View = Awaited<ReturnType<typeof brandView>>;
+type Renders = Awaited<ReturnType<typeof brandRenders>>;
 
-const EVENT_PILL: Record<string, "licensed" | "revoked" | "waiting" | "expired" | "neutral" | "lime"> = {
-  requested: "neutral",
-  generating: "neutral",
-  generated: "neutral",
-  waiting: "waiting",
-  verified: "waiting",
-  approved: "licensed",
-  rejected: "waiting",
-  "spend-check": "waiting",
-  "spend-approved": "licensed",
-  signed: "neutral",
-  funded: "neutral",
-  paying: "waiting",
-  paid: "lime",
-  released: "licensed",
-  blocked: "revoked",
-  denied: "revoked",
-  expired: "expired",
-  cancelled: "expired",
-  failed: "revoked",
-  shortlisted: "neutral",
-};
-
-/** The public demo's seeded creators: nobody can sign in as them. */
-const SEEDED = "Seeded demo creator: requests to them won't be answered.";
-const OPEN = ["generating", "review", "verified", "approved", "spend_review", "spend_verified", "paying"];
-const WITH_CREATOR = ["review", "verified"];
-
-// Surfaces and text (light only), as on the creator's dashboard.
-const SURFACE = "rounded-[22px] bg-white text-ink ring-1 ring-black/[0.04]";
-const MUTED = "text-grey";
-const CHIP = "inline-flex max-w-full items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-semibold";
-
-export function BrandAgentConsole({ me }: { me: Me }) {
-  const { refreshMe } = useAuth();
-  // With IDKit on, a brand acts only after its World ID check (one per account, shared with the creator profile).
-  const brandNeedsCheck = !!me.presence?.required && !me.presence.verified;
-  const [meta, setMeta] = useState<Meta | null>(null);
-  const [brief, setBrief] = useState("A runner at sunrise on a mountain trail, wearing our new trail shoes");
-  const [category, setCategory] = useState("Fitness");
-  const [kind, setKind] = useState<Kind>("image");
-  const [durationDays, setDurationDays] = useState(30);
-  const [maxPrice, setMaxPrice] = useState("0.20");
-  const [budget, setBudget] = useState("0.50");
-  const [shortlist, setShortlist] = useState<{ entries: ShortlistEntry[]; budget: string; problems: string[]; source?: DataSource } | null>(null);
-  // Each shortlist's requests carry an idempotency key: a double-click sends the same request once.
-  const [shortlistKey, setShortlistKey] = useState("");
-  // What happened to each request sent from this shortlist, shown on its card: the request's id, or why it was refused.
-  const [sent, setSent] = useState<Record<string, { id: string } | { error: string }>>({});
-  const [devExpire, setDevExpire] = useState(false);
-  const [activity, setActivity] = useState<Activity | null>(null);
-  const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  // The 3 s refresh's own trouble (e.g. the server restarting): shown while it lasts, gone when it answers again.
-  const [loadError, setLoadError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    try {
-      setActivity(await getJson<Activity>("/api/facevisa/agent/activity"));
-      setLoadError(null);
-    } catch (e) {
-      setLoadError((e as Error).message);
-    }
-  }, []);
-  useEffect(() => {
-    void getJson<Meta>("/api/facevisa").then(setMeta, () => undefined);
-    void load();
-    const t = setInterval(() => void load(), 3000);
-    return () => clearInterval(t);
-  }, [load]);
-  useEffect(() => setDevExpire(!!meta?.devTools), [meta]);
-
-  const run = async (what: string, f: () => Promise<unknown>) => {
-    setBusy(what);
-    setError(null);
-    try {
-      await f();
-      await load();
-    } catch (e) {
-      const r = (e as { reasons?: string[] }).reasons;
-      setError(r?.length ? r.join("; ") : (e as Error).message);
-    } finally {
-      setBusy(null);
-    }
-  };
-  const ask = { brief, category, kind, durationDays };
-  // Send one request from the shortlist; its outcome shows on that creator's card (and the request below).
-  const sendRequest = async (creator: string) => {
-    setBusy(`req-${creator}`);
-    setError(null);
-    try {
-      const r = await postJson<{ request?: { id: string } }>("/api/facevisa/agent/request", { ...ask, creator, requestKey: `${shortlistKey}:${creator}` });
-      setSent((m) => ({ ...m, [creator]: { id: r.request?.id ?? "" } }));
-      await load();
-    } catch (e) {
-      const reasons = (e as { reasons?: string[] }).reasons;
-      setSent((m) => ({ ...m, [creator]: { error: reasons?.length ? reasons.join("; ") : (e as Error).message } }));
-    } finally {
-      setBusy(null);
-    }
-  };
-  const name = me.account?.name ?? "Brand";
-  const requests = activity?.requests ?? [];
-  const licences = activity?.licences ?? [];
-  const pay = meta?.payments;
+export function BrandHome({ v, renders, notice, demoWallet }: { v: View; renders: Renders; notice?: React.ReactNode; demoWallet: boolean }) {
+  const { brand, mandate: m, wallet, creators, licences, spentToday } = v;
+  const active = licences.filter((l) => l.state === "active");
+  const charged = renders.filter((x) => x.render.captureId);
+  const refunded = charged.filter((x) => x.render.refundId).reduce((t, x) => t + x.render.amountCents, 0);
+  const walletPill = wallet ? (wallet.kind === "demo" ? <StatusPill kind="waiting" title="A shared sandbox buyer wallet">Demo wallet</StatusPill> : <StatusPill kind="licensed">Saved</StatusPill>) : <StatusPill kind="lime">Not saved</StatusPill>;
+  const mandatePill = m ? <StatusPill kind={m.status === "active" ? "licensed" : m.status === "pending_wallet" ? "waiting" : "revoked"}>{m.status.replace("_", " ")}</StatusPill> : <StatusPill kind="neutral">None yet</StatusPill>;
 
   return (
-    <div className="min-h-[70vh]">
-      <Page>
-        {error && <ErrorCard>{error}</ErrorCard>}
-        {loadError && <ErrorCard>{loadError}{activity ? " What's below may be out of date; it refreshes when the server answers." : ""}</ErrorCard>}
+    <div className="mx-auto flex w-full max-w-[1320px] flex-col gap-[18px] px-4 pb-12 pt-6 sm:px-8">
+      <Banner
+        label="Your brand workspace"
+        visual={<Monogram name={brand.name} />}
+        title={brand.name}
+        sub="Approve once: a mandate with your spending limits, and your PayPal wallet saved for pay-per-render. Then license a creator and make ads in the Studio."
+        chips={
+          <>
+            <span className={`${CHIP} bg-paper text-ink`}>PayPal wallet: {wallet ? (wallet.kind === "demo" ? "demo wallet" : "saved") : "not saved"}</span>
+            <span className={`${CHIP} bg-paper text-ink`}>Mandate: {m ? m.status.replace("_", " ") : "none yet"}</span>
+            <span className={`${CHIP} bg-violet-soft text-wait`}>
+              {active.length} active licence{active.length === 1 ? "" : "s"}
+            </span>
+          </>
+        }
+        actions={
+          <Link href="/brand/studio" className={btnClass("lime")}>
+            Open Studio
+          </Link>
+        }
+      />
 
-        {/* ------------------------------------------------ header: who, how they pay, the limits */}
-        <section className={`${SURFACE} flex flex-col gap-5 p-5 sm:flex-row sm:items-center sm:p-6`} aria-label="Your brand workspace">
-          <span aria-hidden="true" className="flex h-28 w-28 shrink-0 items-center justify-center self-center rounded-[26px] bg-ink font-display text-[48px] font-extrabold text-lime ring-4 ring-lime sm:self-start">
-            {(name.trim()[0] ?? "B").toUpperCase()}
-          </span>
-          <div className="flex min-w-0 flex-1 flex-col gap-3">
-            <div className="flex flex-col gap-1">
-              <span className={`text-[12px] font-semibold uppercase tracking-[0.08em] ${MUTED}`}>Brand workspace</span>
-              <h1 className="m-0 font-display text-[clamp(26px,4vw,36px)] font-extrabold leading-[1.05] tracking-[-0.01em]">{name}</h1>
-              <p className={`m-0 text-[14px] ${MUTED}`}>Your agent shortlists, asks and makes the ad. Each creator approves the finished ad in FaceVisa before it is paid for and released.</p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {me.presence?.required && me.presence.verified && <PresenceBadge presence={me.presence.environment ?? "production"} credential={me.presence.credential} />}
-              {pay?.rail === "whitechain" && (
-                <a href={pay.explorer && pay.settlement ? `${pay.explorer}/address/${pay.settlement}` : undefined} target="_blank" rel="noreferrer" className={`${CHIP} bg-violet-soft text-wait no-underline hover:underline`} title="You sign once; FaceVisa pays the gas; the settlement contract records each payment on chain">
-                  Pays in USDT on Whitechain ↗
-                </a>
-              )}
-              {meta?.hedera?.x402 && (
-                <a href={meta.hedera.audit?.url ?? undefined} target="_blank" rel="noreferrer" className={`${CHIP} bg-violet-soft text-wait no-underline hover:underline`} title="Your agent pays in USDC on Hedera testnet over x402; its audit log (IDs and accounts only) is on Hedera">
-                  Pays in USDC on Hedera{meta.hedera.audit?.url ? " ↗" : ""}
-                </a>
-              )}
-              {meta?.spendLimit && (
-                <span className={`${CHIP} bg-sky text-ink`} title="Above it, the agent pauses until you approve that exact amount in FaceVisa">
-                  Spends alone up to {meta.spendLimit} per ad
-                </span>
-              )}
-              <Link href="/creators" className={`${CHIP} bg-black/5 text-ink no-underline hover:underline`}>
-                See every creator →
-              </Link>
-            </div>
-          </div>
-        </section>
+      {notice}
 
-        {brandNeedsCheck && (
-          <section className={`${SURFACE} flex flex-col gap-3 p-5`} aria-label="Your World ID check">
-            <h2 className="m-0 text-[18px] font-bold">Your World ID check</h2>
-            <p className={`m-0 text-[14px] ${MUTED}`}>Brands are verified with World ID too. Your agent shortlists and asks once you&apos;ve completed it.</p>
-            <PresenceCard me={me} onChange={refreshMe} />
+      <StatsRow>
+        <Stat accent label="Spent" value={m ? usd(m.spentCents) : "–"} note={m ? `of ${usd(m.totalBudgetCents)} budget` : "no mandate yet"} />
+        <Stat label="Today" value={m ? usd(spentToday) : "–"} note={m ? `of ${usd(m.dailyCapCents)} daily cap` : undefined} />
+        <Stat label="Budget left" value={m ? usd(Math.max(0, m.totalBudgetCents - m.spentCents)) : "–"} />
+        <Stat label="Refunded" value={usd(refunded)} note="rejected ads" />
+        <Stat label="Licences" value={active.length} note={`${licences.filter((l) => l.state === "pending").length} waiting for the creator`} />
+      </StatsRow>
+
+      <Panel tone={wallet && m?.status === "active" ? "plain" : "lime"} title="Set up once">
+        <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-2">
+          <section className={`${SURFACE} flex min-w-0 flex-col gap-3 p-5`} aria-label="PayPal wallet">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="m-0 text-[18px] font-bold">1. PayPal wallet</h3>
+              {walletPill}
+            </div>
+            {wallet ? (
+              <dl className="m-0 grid grid-cols-1 gap-2 text-[13px] sm:grid-cols-3">
+                <Fact label="Account" value={wallet.kind === "demo" ? "Demo wallet (sandbox)" : (wallet.payerEmail ?? "PayPal account")} />
+                <Fact label="Vault id" value={<PayPalId id={wallet.paymentTokenId} />} />
+                <Fact label="Saved" value={fmtDay(wallet.createdAt)} />
+              </dl>
+            ) : (
+              <>
+                <p className="m-0 text-[14px]">Save a PayPal wallet once. Each licensed ad is authorized on it, and captured only when it renders and passes its checks.</p>
+                <WalletButton />
+                {demoWallet && (
+                  <form action={attachDemoWallet} className="flex flex-wrap items-center gap-3 border-t border-divider pt-3">
+                    <button className={OUTLINE}>Use demo wallet</button>
+                    <span className={`text-[13px] ${MUTED}`}>No sandbox login? Use a shared sandbox buyer wallet instead.</span>
+                  </form>
+                )}
+              </>
+            )}
+            <span className={`text-[12px] ${MUTED}`}>PayPal Vault, usage UNSCHEDULED_POSTPAID: charged per ad, never in advance.</span>
           </section>
-        )}
-        {meta?.consent === "dev" && <div className="rounded-[20px] bg-wait-bg p-[18px] text-[14px] text-wait">DevConsent is on (local development, no sign-in configured): requests are approved at once, with no creator check.</div>}
 
-        {/* ------------------------------------------------ stats */}
-        <section className="grid grid-cols-2 gap-3 md:grid-cols-5" aria-label="Your numbers">
-          <Stat label="Spent today" value={activity?.spentToday ?? "—"} note={pay?.rail === "whitechain" ? "USDT on Whitechain" : undefined} accent />
-          <Stat label="Open requests" value={requests.filter((r) => OPEN.includes(r.status)).length} />
-          <Stat label="With creators" value={requests.filter((r) => WITH_CREATOR.includes(r.status)).length} note="waiting for approval" />
-          <Stat label="Released ads" value={licences.length} />
-          <Stat label="Revoked" value={licences.filter((l) => l.status === "revoked").length} />
-        </section>
-
-        {/* ------------------------------------------------ the brief */}
-        <section className="flex flex-col gap-4 rounded-[22px] bg-lime p-5 text-ink sm:p-6" aria-label="Brief your agent">
-          <div className="flex flex-col gap-0.5">
-            <h2 className="m-0 text-[20px] font-bold">Brief your agent</h2>
-            <p className="m-0 text-[14px] text-ink/70">What the ad shows, where it&apos;s used, for how long, and what you&apos;ll pay.{meta?.presence ? ` It shortlists only creators with ${acceptedLabel(meta.presence.environment)}.` : ""}</p>
-          </div>
-          <form
-            className="flex flex-col gap-3"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void run("shortlist", async () => {
-                setShortlist(null);
-                setSent({});
-                setShortlist(await postJson<{ entries: ShortlistEntry[]; budget: string; problems: string[]; source?: DataSource }>("/api/facevisa/agent/shortlist", { ...ask, maxPrice, budget }));
-                setShortlistKey(crypto.randomUUID());
-              });
-            }}
-          >
-            <Field label="What the ad shows">
-              <textarea className={`${inputClass} min-h-20 py-3`} maxLength={600} value={brief} onChange={(e) => setBrief(e.target.value)} />
-            </Field>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-              <Field label="Category">
-                <select className={inputClass} value={category} onChange={(e) => setCategory(e.target.value)}>
-                  {(meta?.categories ?? [category]).map((c) => (
-                    <option key={c}>{c}</option>
-                  ))}
-                </select>
-              </Field>
-              <Field label="Media">
-                <select className={inputClass} value={kind} onChange={(e) => setKind(e.target.value as Kind)}>
-                  <option value="image">Image</option>
-                  <option value="video">Video (8 s)</option>
-                </select>
-              </Field>
-              <Field label="Days of use">
-                <input className={inputClass} type="number" min={1} max={meta?.maxDays ?? 180} value={durationDays} onChange={(e) => setDurationDays(Number(e.target.value))} />
-              </Field>
+          <section className={`${SURFACE} flex min-w-0 flex-col gap-3 p-5`} aria-label="Mandate">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="m-0 text-[18px] font-bold">2. Mandate</h3>
+              {mandatePill}
+            </div>
+            {m && (
+              <p className={`m-0 text-[13px] ${MUTED}`}>
+                Max {usd(m.maxPerRenderCents)} per ad · step-up above {usd(m.stepUpThresholdCents)} · expires {fmtDay(m.expiresAt)}
+              </p>
+            )}
+            <form action={saveMandate} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="Max per render ($)">
-                <input className={inputClass} inputMode="decimal" value={maxPrice} onChange={(e) => setMaxPrice(e.target.value.trim())} />
+                <input name="perRender" type="number" min="0.5" step="0.01" defaultValue={((m?.maxPerRenderCents ?? 1000) / 100).toFixed(2)} className={inputClass} />
               </Field>
-              <Field label="Budget ($)">
-                <input className={inputClass} inputMode="decimal" value={budget} onChange={(e) => setBudget(e.target.value.trim())} />
+              <Field label="Daily cap ($)">
+                <input name="daily" type="number" min="0.5" step="0.01" defaultValue={((m?.dailyCapCents ?? 2000) / 100).toFixed(2)} className={inputClass} />
               </Field>
-            </div>
-            <button type="submit" disabled={!!busy || brandNeedsCheck} className={btnClass("ink", "self-start")}>
-              {busy === "shortlist" ? "Shortlisting…" : "Shortlist creators"}
-            </button>
-          </form>
-        </section>
-
-        {/* ------------------------------------------------ the shortlist, with faces */}
-        {shortlist && (
-          <section className="flex flex-col gap-3" aria-label="The agent's shortlist">
-            <div className="flex flex-wrap items-end justify-between gap-2">
-              <h2 className="m-0 text-[20px] font-bold">The agent&apos;s shortlist</h2>
-              <span className={`text-[13px] ${MUTED}`}>budget left: {shortlist.budget}</span>
-            </div>
-            <SourceLabel s={shortlist.source} />
-            {shortlist.entries.length ? (
-              <ul className="m-0 grid list-none grid-cols-1 gap-3 p-0 sm:grid-cols-2 lg:grid-cols-3">
-                {shortlist.entries.map((e) => (
-                  <li key={e.creator} className={`${SURFACE} flex flex-col overflow-hidden ${e.pick ? "" : "opacity-80"}`}>
-                    <div className="relative aspect-[4/3] w-full bg-paper">
-                      <CreatorFace face={e.face} name={e.name} size="fill" rounded="rounded-none" className="absolute inset-0" />
-                      <span className={`absolute left-3 top-3 ${CHIP} ${e.pick ? "bg-lime text-ink" : "bg-white/90 text-ink"}`}>{e.pick ? "Pick" : "Skip"}</span>
-                    </div>
-                    <div className="flex flex-1 flex-col gap-2 p-4">
-                      <div className="flex items-start justify-between gap-2">
-                        <b className="text-[16px] leading-snug">{e.name}</b>
-                        <span className="tnum shrink-0 text-[15px] font-bold">{e.price}</span>
-                      </div>
-                      <span className={`text-[12px] ${MUTED}`}>for one {kind}</span>
-                      <div className="flex flex-wrap gap-1.5">
-                        {e.presence !== undefined && <PresenceBadge presence={e.presence} credential={e.credential} />}
-                        {e.youtube && <StatusPill kind="licensed" title={`"${e.youtube.title}": the channel belongs to the Google account that granted access`}>Verified YouTube channel</StatusPill>}
-                        {e.youtube?.faceMatch && <StatusPill kind="licensed" title="2+ of the channel's images match the creator's live capture">Face matches channel</StatusPill>}
-                      </div>
-                      <CreatorStatsRow stats={e.stats} arkiv={e.statsArkiv} usagePage={e.usagePage} />
-                      <span className={`text-[13px] ${e.pick ? "text-ok" : MUTED}`}>{e.reason}</span>
-                      {e.seeded && <span className="text-[12px] text-wait">{SEEDED}</span>}
-                      <ItemSource source={e.source} url={e.url} why={e.why} />
-                      {e.pick && (() => {
-                        const out = sent[e.creator];
-                        if (out && "id" in out) {
-                          const r = requests.find((x) => x.id === out.id);
-                          return (
-                            <div role="status" className="mt-auto flex flex-col gap-1.5 rounded-[14px] bg-ok-bg p-3 text-[13px]">
-                              <span className="flex flex-wrap items-center gap-2">
-                                <b className="text-ok">Request sent</b>
-                                {r && <StatusPill kind={STATUS[r.status].pill}>{STATUS[r.status].label}</StatusPill>}
-                              </span>
-                              <span className={MUTED}>{!r || r.status === "generating" ? "The agent is making the ad; it stays private until the creator approves it." : ["review", "verified"].includes(r.status) ? "The ad is ready and waiting for the creator's approval." : r.reason ?? STATUS[r.status].label}</span>
-                              <a href="#requests" className="font-semibold text-ink underline">See it in Requests ↓</a>
-                            </div>
-                          );
-                        }
-                        return (
-                          <div className="mt-auto flex flex-col gap-2">
-                            {out && "error" in out && <span role="alert" className="rounded-[12px] bg-bad-bg px-3 py-2 text-[13px] text-bad">Not sent: {out.error}</span>}
-                            <button type="button" disabled={!!busy} onClick={() => void sendRequest(e.creator)} className={btnClass("lime", "min-h-10 self-start")}>
-                              {busy === `req-${e.creator}` ? (meta?.payments?.rail === "whitechain" ? "Sending (topping up USDT if needed)…" : "Sending…") : out ? "Try again" : "Send request"}
-                            </button>
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <div className={`${SURFACE} p-5 text-[14px] ${MUTED}`}>No listed creators yet.</div>
-            )}
-          </section>
-        )}
-
-        <div className="grid grid-cols-1 items-start gap-[18px] desk:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
-          <div className="flex min-w-0 flex-col gap-[18px]">
-            {/* ------------------------------------------------ requests */}
-            <section id="requests" className={`${SURFACE} flex scroll-mt-4 flex-col gap-3 p-5`} aria-label="Requests">
-              <h2 className="m-0 text-[20px] font-bold">Requests</h2>
-              {!activity ? (
-                <p className={`m-0 text-[14px] ${MUTED}`}>{loadError ? "Your requests show here once the server answers." : "Loading your requests…"}</p>
-              ) : requests.length ? (
-                <ul className="m-0 flex list-none flex-col gap-2 p-0">
-                  {requests.map((r) => (
-                    <li key={r.id} className="flex gap-3 rounded-[16px] bg-paper p-3">
-                      <CreatorFace face={r.face} name={r.creator} size={56} rounded="rounded-[14px]" />
-                      <div className="flex min-w-0 flex-1 flex-col gap-1">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <b className="text-[15px]">
-                            {r.self ? "Your own creator profile" : r.creator} · one {r.kind} at {r.price}, {r.durationDays} days
-                          </b>
-                          <StatusPill kind={STATUS[r.status].pill}>{STATUS[r.status].label}</StatusPill>
-                        </div>
-                        <span className={`text-[13px] ${MUTED}`}>
-                          “{r.brief}” · {r.category}
-                          {r.output ? ` · ${r.output.provider === "test" ? "TEST RENDER" : r.output.model}, face check ${r.output.faceCheck === "passed" ? "passed" : "not run"}${r.generation > 1 ? ", second version" : ""}` : ""}
-                          {["review", "verified", "spend_review", "spend_verified", "approved"].includes(r.status) ? ` · until ${when(r.expiresAt)}` : r.reason ? ` · ${r.reason}` : ""}
-                        </span>
-                        <SlowStep status={r.status} kind={r.kind} since={r.stepAt} ai={meta?.ai} rail={meta?.payments?.rail} />
-                        {r.consent && <span className="text-[13px] text-ok">Approved by the creator in FaceVisa, {when(r.consent.approvedAt)}{r.consent.method === "demo" ? " (a demo identity)" : r.consent.method === "google" ? " (signed in with Google)" : r.consent.method === "dev" ? " (local dev sign-in)" : ""}</span>}
-                        {r.spend?.approvedAt && <span className="text-[13px] text-ok">Spend approved by the brand, {when(r.spend.approvedAt)}</span>}
-                        {r.seededCreator && ["generating", "review", "verified"].includes(r.status) && <span className="text-[13px] text-wait">{SEEDED}</span>}
-                        {(r.status === "spend_review" || r.status === "spend_verified") && (
-                          <Link href={`/spend/${r.id}`} className={btnClass("lime", "min-h-9 self-start")}>
-                            Approve the spend of {r.price} (over your limit)
-                          </Link>
-                        )}
-                        {r.status === "approved" && r.lastStep?.kind === "blocked" && <span className="text-[13px] text-wait">Not paid yet: {r.lastStep.summary.replace(/^not paid: /, "")}</span>}
-                        {r.status === "approved" && (
-                          <button type="button" disabled={!!busy} className={btnClass("lime", "min-h-9 self-start")} onClick={() => void run(`release-${r.id}`, () => postJson("/api/facevisa/agent/release", { id: r.id }))}>
-                            {busy === `release-${r.id}` ? "Paying…" : `Pay ${r.price} and release`}
-                          </button>
-                        )}
-                        {["failed", "expired", "cancelled"].includes(r.status) && r.creatorId && !r.seededCreator && (
-                          <button
-                            type="button"
-                            disabled={!!busy}
-                            className={btnClass("lime", "min-h-9 self-start")}
-                            onClick={() => void run(`again-${r.id}`, () => postJson("/api/facevisa/agent/request", { brief: r.brief, category: r.category, kind: r.kind, durationDays: r.durationDays, creator: r.creatorId, requestKey: `again:${r.id}` }))}
-                          >
-                            {busy === `again-${r.id}` ? "Asking again…" : `Ask again (same terms, ${r.price})`}
-                          </button>
-                        )}
-                        {["generating", "review", "verified", "approved", "spend_review", "spend_verified"].includes(r.status) && (
-                          <div className="flex flex-wrap gap-2">
-                            <button type="button" className={btnClass("ghost", "min-h-8 px-0")} onClick={() => void run(`cancel-${r.id}`, () => postJson("/api/facevisa/agent/cancel", { id: r.id }))}>
-                              Cancel request
-                            </button>
-                            {devExpire && r.status !== "generating" && (
-                              <button type="button" className={btnClass("ghost", "min-h-8 px-0")} onClick={() => void run(`expire-${r.id}`, () => postJson("/api/dev/expire-request", { id: r.id }))}>
-                                Dev: expire now
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <div className="flex flex-col items-start gap-2 rounded-[16px] bg-paper p-4">
-                  <b className="text-[15px]">No requests yet</b>
-                  <span className={`text-[14px] ${MUTED}`}>Brief your agent and send a request; it waits for the creator&apos;s own approval.</span>
-                </div>
-              )}
-            </section>
-
-            {/* ------------------------------------------------ released ads */}
-            <section className="flex flex-col gap-3" aria-label="Released ads">
-              <div className="flex flex-wrap items-end justify-between gap-2">
-                <h2 className="m-0 text-[20px] font-bold">Released ads</h2>
-                {activity && <span className={`text-[13px] ${MUTED}`}>spent today {activity.spentToday}</span>}
+              <Field label="Total budget ($)">
+                <input name="budget" type="number" min="0.5" step="0.01" defaultValue={((m?.totalBudgetCents ?? 5000) / 100).toFixed(2)} className={inputClass} />
+              </Field>
+              <Field label="Step-up above ($)" hint="Renders above this wait for your approval">
+                <input name="stepUp" type="number" min="0" step="0.01" defaultValue={((m?.stepUpThresholdCents ?? 500) / 100).toFixed(2)} className={inputClass} />
+              </Field>
+              <Field label="Valid for (days)">
+                <input name="days" type="number" min="1" max="365" defaultValue={30} className={inputClass} />
+              </Field>
+              <div className="flex items-end">
+                <button className={btnClass("ink", "w-full cursor-pointer")}>{m ? "Update mandate" : "Save mandate"}</button>
               </div>
-              {licences.length ? (
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  {licences.map((l) => (
-                    <article key={l.id} className={`${SURFACE} flex flex-col gap-2 overflow-hidden p-3`}>
-                      {l.receipt && <MediaTile file={l.receipt.file} mime={l.receipt.mime} verifyHash={l.receipt.hash} swarm={l.receipt.swarm} caption={`${l.receipt.provider === "test" ? "TEST RENDER" : l.receipt.model} · paid ${l.price}`} />}
-                      <div className="flex items-center justify-between gap-2">
-                        <b className="text-[14px]">{l.creator}</b>
-                        <StatusPill kind={l.status === "active" ? "licensed" : "revoked"}>{l.status === "active" ? `Until ${when(l.expiresAt)}` : "Revoked by the creator"}</StatusPill>
-                      </div>
-                      <span className={`text-[13px] ${MUTED}`}>{l.category}</span>
-                      {l.receipt?.payment && (
-                        <span className={`text-[12px] ${MUTED}`}>
-                          Paid {l.price}: <PaymentLine p={l.receipt.payment} />
-                        </span>
-                      )}
-                    </article>
-                  ))}
-                </div>
-              ) : (
-                <div className={`${SURFACE} p-5 text-[14px] ${MUTED}`}>An ad is released only after its creator approves that exact ad in FaceVisa; then the agent pays on its own.</div>
-              )}
-            </section>
-          </div>
-
-          {/* ------------------------------------------------ the agent's log */}
-          <section className="flex flex-col gap-3 rounded-[22px] bg-ink p-5 text-white" aria-label="Agent activity">
-            <h2 className="m-0 text-[20px] font-bold">Agent activity</h2>
-            {activity?.events.length ? (
-              <ol className="m-0 flex list-none flex-col gap-2 p-0">
-                {activity.events.map((e) => (
-                  <li key={e.id} className="flex flex-col gap-0.5 border-b border-white/10 pb-2 text-[13px] last:border-0">
-                    <span className="flex items-center gap-2">
-                      <StatusPill kind={EVENT_PILL[e.kind] ?? "neutral"}>{e.kind}</StatusPill>
-                      <span className="text-[#B9BCC4]">{new Date(e.at).toLocaleTimeString()}</span>
-                    </span>
-                    <span className="text-white [overflow-wrap:anywhere]">{e.summary}</span>
-                  </li>
-                ))}
-              </ol>
-            ) : (
-              <p className="m-0 text-[14px] text-[#B9BCC4]">The agent&apos;s steps show here: requested → generated → waiting → approved → paid → released, or blocked with the reason.</p>
-            )}
+            </form>
           </section>
         </div>
-      </Page>
-    </div>
-  );
-}
+      </Panel>
 
-function Stat({ label, value, note, accent = false }: { label: string; value: ReactNode; note?: ReactNode; accent?: boolean }) {
-  return (
-    <div className={`flex min-w-0 flex-col gap-1 rounded-[20px] px-4 py-4 ${accent ? "col-span-2 bg-ink text-white md:col-span-1" : SURFACE}`}>
-      <span className={`text-[12px] font-semibold uppercase tracking-[0.06em] ${accent ? "text-grey-dark" : MUTED}`}>{label}</span>
-      <span className="tnum font-display text-[30px] font-extrabold leading-none">{value}</span>
-      {note && <span className={`text-[12px] ${accent ? "text-grey-dark" : MUTED}`}>{note}</span>}
+      <div className="grid grid-cols-1 items-start gap-[18px] lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
+        <Panel tone="surface" title="Request a licence">
+          {creators.map((c) => (
+            <form key={c.id} action={requestLicence} className="flex flex-col gap-3">
+              <input type="hidden" name="creatorId" value={c.id} />
+              <div className="flex items-center gap-3">
+                <CreatorFace seed={c.id} photo={c.photoRef ?? "/demo/rohit.svg"} size={56} />
+                <div className="min-w-0 text-[14px]">
+                  <p className="m-0 font-semibold">{c.name}</p>
+                  <p className={`m-0 ${MUTED}`}>
+                    {usd(c.pricePerRenderCents)} per image · {usd(c.pricePerRenderCents * c.videoMultiplier)} per video · up to {c.maxRendersPerLicence} renders, {c.maxDays} days
+                  </p>
+                </div>
+              </div>
+              <Field label="Uses" group>
+                <div className="flex flex-wrap gap-2">
+                  {c.allowedUses.map((u) => (
+                    <label key={u} className={chipClass}>
+                      <input type="checkbox" name="uses" value={u} defaultChecked={u === "advertising"} className="h-4 w-4 accent-lime" />
+                      {u}
+                    </label>
+                  ))}
+                </div>
+              </Field>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Renders">
+                  <input name="renderCap" type="number" min="1" max={c.maxRendersPerLicence} defaultValue={Math.min(5, c.maxRendersPerLicence)} className={inputClass} />
+                </Field>
+                <Field label="Days">
+                  <input name="days" type="number" min="1" max={c.maxDays} defaultValue={Math.min(14, c.maxDays)} className={inputClass} />
+                </Field>
+              </div>
+              <Field label="Campaign brief">
+                <textarea name="brief" rows={2} minLength={10} maxLength={600} defaultValue="Spring launch: three social ads for our new cold brew." className={inputClass} />
+              </Field>
+              <button className={btnClass("lime", "cursor-pointer self-start")} disabled={!c.acceptingLicences}>
+                Send request
+              </button>
+            </form>
+          ))}
+        </Panel>
+
+        <Panel title={`Licences${licences.length ? ` (${licences.length})` : ""}`}>
+          {licences.length === 0 ? (
+            <Empty>No licences yet. Send a request, then approve it as the Creator.</Empty>
+          ) : (
+            <ul className="m-0 grid list-none grid-cols-1 gap-3 p-0 sm:grid-cols-2">
+              {licences.map((l) => (
+                <li key={l.id} className={`${SURFACE} flex min-w-0 flex-col gap-2 p-4`}>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <b className="truncate text-[16px]">{l.creatorName}</b>
+                    <StatusBadge status={l.state} />
+                  </div>
+                  <dl className="m-0 grid grid-cols-3 gap-2 text-[13px]">
+                    <Fact label="Uses" value={l.allowedUses.join(", ")} />
+                    <Fact label="Renders" value={`${l.rendersUsed} of ${l.renderCap}`} />
+                    <Fact label="Until" value={l.expiresAt ? fmtDay(l.expiresAt) : "–"} />
+                  </dl>
+                  <span className={`text-[13px] ${MUTED}`}>{usd(l.pricePerRenderCents)} per image · video 3×</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Panel>
+      </div>
+
+      <Panel tone="surface" title="Spend" action={<span className={`text-[13px] ${MUTED}`}>every ad charged to your wallet</span>}>
+        {charged.length === 0 ? (
+          <Empty>Nothing charged yet. Ads you make in the Studio show up here with their PayPal capture and payout or refund.</Empty>
+        ) : (
+          <div className="relative -mx-1 overflow-x-auto px-1">
+            <table className="w-full min-w-[640px] border-collapse text-left text-[14px]">
+              <thead className={`text-[13px] ${MUTED}`}>
+                <tr>
+                  <th className="py-2 pr-3 font-medium">Date</th>
+                  <th className="pr-3 font-medium">Creator</th>
+                  <th className="pr-3 font-medium">Amount</th>
+                  <th className="pr-3 font-medium">Status</th>
+                  <th className="pr-3 font-medium">Capture</th>
+                  <th className="pr-3 font-medium">Payout / refund</th>
+                  <th className="font-medium">Receipt</th>
+                </tr>
+              </thead>
+              <tbody>
+                {charged.map(({ render: r, creatorName, receiptId }) => (
+                  <tr key={r.id} className="border-t border-divider">
+                    <td className="py-2.5 pr-3 whitespace-nowrap">{when(r.createdAt)}</td>
+                    <td className="pr-3">{creatorName}</td>
+                    <td className="tnum pr-3 font-semibold">{usd(r.amountCents)}</td>
+                    <td className="pr-3">
+                      <StatusPill kind={renderPill(r.status)}>{STATUS_LABEL[r.status] ?? r.status}</StatusPill>
+                    </td>
+                    <td className="pr-3">
+                      <PayPalId id={r.captureId} />
+                    </td>
+                    <td className="pr-3">{r.payoutBatchId ? <PayPalId id={r.payoutBatchId} /> : r.refundId ? <PayPalId id={r.refundId} /> : <span className={MUTED}>–</span>}</td>
+                    <td>
+                      {receiptId ? (
+                        <Link href={`/verify/${receiptId}`} className="inline-flex min-h-11 items-center font-semibold text-ink underline">
+                          View
+                        </Link>
+                      ) : (
+                        <span className={MUTED}>–</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Panel>
     </div>
   );
 }

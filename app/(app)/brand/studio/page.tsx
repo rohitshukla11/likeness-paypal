@@ -2,7 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { BrandAgent } from "@/components/agent/BrandAgent";
-import { AppPage, btnClass, Card, StatCard } from "@/components/ds";
+import { btnClass } from "@/components/ds";
+import { Banner, Empty, Fact, Monogram, OUTLINE, Panel, Stat, StatsRow, SURFACE } from "@/components/dashboard/kit";
 import { geminiConfigured } from "@/lib/ai/gemini";
 import { RenderCard } from "@/components/dashboard/RenderCard";
 import { usd } from "@/components/dashboard/shared";
@@ -28,34 +29,86 @@ async function Studio({ searchParams }: PageProps<"/brand/studio">) {
   if (!s) redirect("/");
   await settle(engineDeps()).catch(() => []);
   const q = await searchParams;
-  const [{ mandate: m, wallet, licences, spentToday }, renders] = await Promise.all([brandView(s.brandId), brandRenders(s.brandId)]);
+  const [{ brand, mandate: m, wallet, licences, spentToday }, renders] = await Promise.all([brandView(s.brandId), brandRenders(s.brandId)]);
   const active = licences.filter((l) => l.state === "active");
   const ready = !!wallet && !!m && active.length > 0;
 
   return (
-    <AppPage
-      title="Studio"
-      description="Each render is checked against the licence and your mandate, authorized on your saved PayPal wallet, rendered, checked and captured. Then accept (the creator is paid 90%) or reject (you're refunded)."
-      actions={
-        <Link href="/brand" className={btnClass("outline")}>
-          Brand settings
-        </Link>
-      }
-    >
+    <div className="mx-auto flex w-full max-w-[1320px] flex-col gap-[18px] px-4 pb-12 pt-6 sm:px-8">
+      <Banner
+        label="Studio"
+        visual={<Monogram name={brand.name} />}
+        title="Studio"
+        sub="Each ad is checked against the licence and your mandate, authorized on your saved PayPal wallet, rendered, checked and captured. Then accept (the creator is paid 90%) or reject (you're refunded)."
+        actions={
+          <Link href="/brand" className={OUTLINE}>
+            Brand settings
+          </Link>
+        }
+      />
       <Notice ok={q.ok} error={q.error} />
-      {geminiConfigured() && <BrandAgent />}
 
-      {m && (
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          <StatCard label="Spent" value={usd(m.spentCents)} note={`of ${usd(m.totalBudgetCents)} budget`} />
-          <StatCard label="Today" value={usd(spentToday)} note={`of ${usd(m.dailyCapCents)} daily cap`} />
-          <StatCard label="Max per render" value={usd(m.maxPerRenderCents)} note="mandate limit" />
-          <StatCard label="Step-up above" value={usd(m.stepUpThresholdCents)} note="you approve these first" />
-        </div>
+      {geminiConfigured() && (
+        <Panel tone="lime" title="Brief your agent" label="Brief your agent">
+          <BrandAgent />
+        </Panel>
       )}
 
-      <div className="grid grid-cols-1 items-start gap-[18px] desk:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
-        <Card title="New render">
+      {m && (
+        <StatsRow label="Your mandate">
+          <Stat accent label="Spent" value={usd(m.spentCents)} note={`of ${usd(m.totalBudgetCents)} budget`} />
+          <Stat label="Today" value={usd(spentToday)} note={`of ${usd(m.dailyCapCents)} daily cap`} />
+          <Stat label="Max per ad" value={usd(m.maxPerRenderCents)} note="mandate limit" />
+          <Stat label="Step-up above" value={usd(m.stepUpThresholdCents)} note="you approve these first" />
+          <Stat label="Ads" value={renders.length} note={`${renders.filter((x) => x.render.status === "in_review").length} in review`} />
+        </StatsRow>
+      )}
+
+      <div className="grid grid-cols-1 items-start gap-[18px] lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+        <Panel title={`Your ads${renders.length ? ` (${renders.length})` : ""}`}>
+          {renders.length === 0 ? (
+            <Empty>No ads yet. Ask the agent or use the form: each ad shows up here with its PayPal order, capture and payout or refund.</Empty>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {renders.map(({ render: r, receiptId, creatorName, refusal }) => (
+                <div key={r.id} className={`${SURFACE} p-2`}>
+                  <RenderCard
+                    r={r}
+                    mode="brand"
+                    name={creatorName}
+                    receiptId={receiptId}
+                    refusal={refusal}
+                    actions={
+                      r.status === "in_review" && r.reviewDeadline ? (
+                        <>
+                          <form action={acceptRender.bind(null, r.id)}>
+                            <button className={btnClass("lime", "cursor-pointer")}>Accept</button>
+                          </form>
+                          <form action={rejectRender.bind(null, r.id)}>
+                            <button className={btnClass("danger", "cursor-pointer")}>Reject</button>
+                          </form>
+                          <Countdown deadline={r.reviewDeadline.toISOString()} />
+                        </>
+                      ) : r.status === "needs_brand_approval" ? (
+                        <>
+                          <form action={approveRender.bind(null, r.id)}>
+                            <button className={btnClass("lime", "cursor-pointer")}>Approve {usd(r.amountCents)}</button>
+                          </form>
+                          <form action={declineRender.bind(null, r.id)}>
+                            <button className={btnClass("outline", "cursor-pointer")}>Decline</button>
+                          </form>
+                        </>
+                      ) : undefined
+                    }
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+        </Panel>
+
+        <div className="flex min-w-0 flex-col gap-[18px]">
+        <Panel tone="surface" title="Make an ad with the form">
           {!wallet || !m ? (
             <p className="m-0 text-[14px] text-wait">
               {!wallet ? "Save your PayPal wallet" : "Save a mandate"} on the{" "}
@@ -117,47 +170,21 @@ async function Studio({ searchParams }: PageProps<"/brand/studio">) {
             </button>
             <p className="m-0 text-[13px] text-grey">Demo renders come from pre-generated images (no AI call, no cost). The PayPal calls are real sandbox calls.</p>
           </form>
-        </Card>
+        </Panel>
 
-        <Card title={`Your renders${renders.length ? ` (${renders.length})` : ""}`}>
-          {renders.length === 0 ? (
-            <p className="m-0 text-grey">No renders yet. Render an ad: it shows up here with its PayPal order, capture and payout or refund.</p>
-          ) : (
-            renders.map(({ render: r, receiptId, creatorName, refusal }) => (
-              <RenderCard
-                key={r.id}
-                r={r}
-                mode="brand"
-                name={creatorName}
-                receiptId={receiptId}
-                refusal={refusal}
-                actions={
-                  r.status === "in_review" && r.reviewDeadline ? (
-                    <>
-                      <form action={acceptRender.bind(null, r.id)}>
-                        <button className={btnClass("lime", "cursor-pointer")}>Accept</button>
-                      </form>
-                      <form action={rejectRender.bind(null, r.id)}>
-                        <button className={btnClass("danger", "cursor-pointer")}>Reject</button>
-                      </form>
-                      <Countdown deadline={r.reviewDeadline.toISOString()} />
-                    </>
-                  ) : r.status === "needs_brand_approval" ? (
-                    <>
-                      <form action={approveRender.bind(null, r.id)}>
-                        <button className={btnClass("lime", "cursor-pointer")}>Approve {usd(r.amountCents)}</button>
-                      </form>
-                      <form action={declineRender.bind(null, r.id)}>
-                        <button className={btnClass("outline", "cursor-pointer")}>Decline</button>
-                      </form>
-                    </>
-                  ) : undefined
-                }
-              />
-            ))
-          )}
-        </Card>
+        {m && (
+          <Panel tone="ink" title="Your mandate">
+            <dl className="m-0 grid grid-cols-2 gap-3 text-[13px]">
+              <Fact label="Status" value={m.status.replace("_", " ")} />
+              <Fact label="Wallet" value={wallet ? (wallet.kind === "demo" ? "demo wallet" : "saved") : "not saved"} />
+              <Fact label="Budget left" value={usd(Math.max(0, m.totalBudgetCents - m.spentCents))} />
+              <Fact label="Expires" value={m.expiresAt.toISOString().slice(0, 10)} />
+            </dl>
+            <p className="m-0 text-[13px] text-grey-dark">Ads above the step-up threshold wait for your approval; anything past a limit is refused before PayPal is called.</p>
+          </Panel>
+        )}
+        </div>
       </div>
-    </AppPage>
+    </div>
   );
 }
