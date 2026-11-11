@@ -14,16 +14,19 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "test": "tsx --conditions=react-server --test --test-reporter=spec tests/*.test.ts",
-    "e2e:engine": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/engine-e2e.ts"
+    "e2e:engine": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/engine-e2e.ts",
+    "face:models": "sh scripts/face-models.sh"
   },
   "dependencies": {
     "@contentauth/c2pa-node": "0.9.9",
     "@google/genai": "2.31.0",
+    "@mediapipe/tasks-vision": "1.1.1",
     "@neondatabase/serverless": "1.2.0",
     "@paypal/agent-toolkit": "1.11.0",
     "ai": "4.3.19",
     "drizzle-orm": "0.45.4",
     "next": "16.4.3",
+    "onnxruntime-node": "1.30.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "server-only": "0.0.1",

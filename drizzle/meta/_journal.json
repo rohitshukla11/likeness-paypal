@@ -29,6 +29,13 @@
       "when": 1794373636747,
       "tag": "0003_eager_power_man",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794374263903,
+      "tag": "0004_shiny_titania",
+      "breakpoints": true
     }
   ]
 }

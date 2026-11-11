@@ -1,6 +1,6 @@
 /** Database schema (Drizzle, Postgres on Neon). Money is stored in integer cents with a currency code. */
 import { sql } from "drizzle-orm";
-import { boolean, customType, index, integer, pgTable, text, timestamp, uniqueIndex, type AnyPgColumn } from "drizzle-orm/pg-core";
+import { boolean, customType, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex, type AnyPgColumn } from "drizzle-orm/pg-core";
 import { BANNED_USES } from "../engine/policy";
 
 export { BANNED_USES };
@@ -78,10 +78,54 @@ export const creators = pgTable(
     maxRendersPerLicence: integer("max_renders_per_licence").notNull().default(10),
     maxDays: integer("max_days").notNull().default(30),
     acceptingLicences: boolean("accepting_licences").notNull().default(true),
+    /** draft until an onboarded creator goes live; the seeded demo creators are live. */
+    status: text("status").notNull().default("live"),
+    // Creator onboarding (FEATURE_CREATOR_ONBOARDING): Google account, YouTube channel, face match, consent.
+    googleSub: text("google_sub"),
+    email: text("email"),
+    channel: jsonb("channel").$type<{ channelId: string; title: string; avatarUrl: string; subscriberCount: number | null; connectedAt: number }>(),
+    verification: jsonb("verification").$type<{
+      faceMatch?: { score: number; threshold: number; framesMatched: number; at: number };
+      liveness?: { blinks: number; turnedLeft: boolean; turnedRight: boolean; method: string; at: number };
+      pendingFrames?: string[] | null;
+      adultSelfDeclaredAt?: number;
+      consent?: { at: number; text: string };
+    }>(),
+    /** The creator's data key, wrapped with PHOTO_KEK (AES-256-GCM); the frames are sealed with it. */
+    wrappedKey: text("wrapped_key"),
+    framesSha256: text("frames_sha256").array(),
+    /** The public photo (front frame, 512 px, labelled "not licensed for reuse"), served at /media/creator/<id>. */
+    publicPhoto: bytea("public_photo"),
     createdAt: createdAt(),
   },
-  (t) => [index("creators_workspace_idx").on(t.workspaceId)],
+  (t) => [index("creators_workspace_idx").on(t.workspaceId), uniqueIndex("creators_google_sub_idx").on(t.googleSub)],
 );
+
+/** A creator's reference frames, each sealed with the creator's data key (v1 | iv | tag | ciphertext). */
+export const creatorFrames = pgTable(
+  "creator_frames",
+  {
+    creatorId: text("creator_id")
+      .notNull()
+      .references(() => creators.id),
+    idx: integer("idx").notNull(),
+    box: bytea("box").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [primaryKey({ columns: [t.creatorId, t.idx] })],
+);
+
+/** Every time a creator's frames were opened, and for which render. */
+export const frameDecryptions = pgTable("frame_decryptions", {
+  id: text("id").primaryKey(),
+  creatorId: text("creator_id")
+    .notNull()
+    .references(() => creators.id),
+  renderId: text("render_id"),
+  licenceId: text("licence_id"),
+  by: text("by").notNull(),
+  at: ts("at").notNull().defaultNow(),
+});
 
 /** A brand. pendingSetupTokenId is the Vault setup token its owner is approving right now. */
 export const brands = pgTable(

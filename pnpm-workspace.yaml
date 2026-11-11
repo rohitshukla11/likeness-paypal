@@ -8,3 +8,5 @@ allowBuilds:
   protobufjs: false
   # Downloads its prebuilt native library (c2pa-rs) from the package's own GitHub release; no Rust build.
   "@contentauth/c2pa-node": true
+  # Its install script only fetches optional GPU (CUDA) libraries on Linux; the CPU binaries ship in the package.
+  onnxruntime-node: false

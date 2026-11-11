@@ -43,3 +43,6 @@ next-env.d.ts
 
 # Private media (the creator reference photo, demo video): never committed
 /private/
+
+# Face matcher weights (pnpm face:models, ~260 MB): never committed
+/.models/
