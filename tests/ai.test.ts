@@ -143,3 +143,85 @@ describe("engine with the AI provider", () => {
     assert.equal(t.store.refusals[0].reason, "render_failed");
   });
 });
+
+describe("AI video (Gemini Omni Flash)", () => {
+  /** A fake Interactions API: background create, then get() until `after` polls have passed. */
+  function fakeOmni(opts: { after?: number; status?: string } = {}) {
+    let polls = 0;
+    const calls: string[] = [];
+    const client = {
+      models: { generateContent: async () => ({ candidates: [{ content: { parts: [{ text: JSON.stringify({ banned: [], fitsCategory: true, reason: "ok" }) }] } }] }) },
+      interactions: {
+        create: async (p: { background?: boolean; response_format?: { duration?: string } }) => {
+          calls.push(`create background=${p.background} duration=${p.response_format?.duration}`);
+          return { id: "v1_test", status: "in_progress" };
+        },
+        get: async () => {
+          calls.push("get");
+          polls++;
+          if (polls < (opts.after ?? 2)) return { id: "v1_test", status: "in_progress" };
+          return opts.status ? { id: "v1_test", status: opts.status } : { id: "v1_test", status: "completed", output_video: { data: Buffer.from("fake-mp4-bytes").toString("base64"), mime_type: "video/mp4" } };
+        },
+        cancel: async () => void calls.push("cancel"),
+      },
+    } as unknown as GenAiLike;
+    return { client, calls };
+  }
+
+  it("runs in the background and polls until the video is done", async () => {
+    const { imageToVideo } = await import("../lib/ai/render-video");
+    const f = fakeOmni({ after: 3 });
+    const out = await imageToVideo({ image: new Uint8Array([1, 2]), mime: "image/jpeg", prompt: "a slow push-in", seconds: 4, pollMs: 1 }, f.client);
+    assert.equal(Buffer.from(out.bytes).toString(), "fake-mp4-bytes");
+    assert.equal(out.model, "gemini-omni-1.2-flash");
+    assert.deepEqual(f.calls, ["create background=true duration=4s", "get", "get", "get"]);
+  });
+
+  it("times out: cancels the job and refuses (the engine then voids)", async () => {
+    const { imageToVideo, VideoRefused } = await import("../lib/ai/render-video");
+    const f = fakeOmni({ after: 1_000_000 });
+    await assert.rejects(imageToVideo({ image: new Uint8Array([1]), mime: "image/jpeg", prompt: "x", timeoutMs: 20, pollMs: 5 }, f.client), VideoRefused);
+    assert.ok(f.calls.includes("cancel"));
+  });
+
+  it("a failed job is refused", async () => {
+    const { imageToVideo } = await import("../lib/ai/render-video");
+    await assert.rejects(imageToVideo({ image: new Uint8Array([1]), mime: "image/jpeg", prompt: "x", pollMs: 1 }, fakeOmni({ after: 1, status: "failed" }).client), /ended the video as failed/);
+  });
+
+  it("over VIDEO_CAP_TOTAL the saved demo clip plays, labelled demo render, with no AI call", async () => {
+    let videoCalls = 0;
+    const g = await fakeGemini();
+    const p = new AiProvider({
+      quota: new MemoryQuota(),
+      stub: new StubProvider(),
+      references: ref,
+      client: g.client,
+      caps: { ...caps, videoTotal: 1 },
+      demoClip: async () => new Uint8Array(Buffer.from("saved-clip")),
+      video: async () => (videoCalls++, { bytes: new Uint8Array([9]), mime: "video/mp4", model: "gemini-omni-1.2-flash" }),
+    });
+    const first = await p.render(input({ kind: "video" }));
+    assert.equal(first.model, "gemini-omni-1.2-flash");
+    const second = await p.render(input({ kind: "video", workspaceId: "ws_other" }));
+    assert.equal(videoCalls, 1, "the cap is total, across workspaces");
+    assert.equal(second.mime, "video/mp4");
+    assert.equal(Buffer.from(second.bytes!).toString(), "saved-clip");
+    assert.match(second.note!, /demo render/);
+  });
+
+  it("a video failure after the authorization voids it", async () => {
+    const g = await fakeGemini();
+    const t = testEngine({
+      mandate: { stepUpThresholdCents: 1000 }, // $6.00 is under the threshold here, so it runs at once
+      provider: new AiProvider({ quota: new MemoryQuota(), stub: new StubProvider(), references: ref, client: g.client, caps, video: async () => Promise.reject(new Error("Omni Flash took longer than 300 s; cancelled")) }),
+    });
+    const r = await renderAndPay({ renderId: "rnd_v1", licenceId: "lic_1", mandateId: "man_1", kind: "video", use: "advertising", prompt: "Rohit with headphones" }, t.deps);
+    assert.equal(r.status, "voided");
+    assert.equal(r.amountCents, 600, "video is priced at 3× the per-render price");
+    assert.deepEqual(
+      t.calls.map((c) => c.op),
+      ["createVaultOrder", "voidAuthorization"],
+    );
+  });
+});

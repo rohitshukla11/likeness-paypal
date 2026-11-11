@@ -7,19 +7,27 @@ import { signPayload } from "../receipts";
 import { stubCompliance } from "./compliance";
 import { AiProvider } from "../ai/provider";
 import { DrizzleQuota } from "../ai/quota-store";
+import { veoPrompt } from "../ai/creative";
 import { demoClip, referencePhotos } from "../ai/reference";
+import { imageToVideo } from "../ai/render-video";
 import { StubProvider, type RenderProvider } from "./providers";
 import type { EngineDeps, PayPalPort } from "./render-and-pay";
 import { DrizzleStore } from "./store";
 
 /**
- * RENDER_PROVIDER=gemini: Gemini images (and, once enabled, Omni Flash video) on the Gemini API within the AI
- * caps; anything else, or unset: the StubProvider (pre-made demo images, no cost).
+ * RENDER_PROVIDER=gemini: Gemini images and Gemini Omni Flash videos on the Gemini API, within the AI caps (over
+ * the video cap the saved demo clip plays); anything else, or unset: the StubProvider (pre-made, no cost).
  */
 export function providerFromEnv(env: NodeJS.ProcessEnv = process.env): RenderProvider {
   const stub = new StubProvider();
   if (env.RENDER_PROVIDER !== "gemini") return stub;
-  return new AiProvider({ quota: new DrizzleQuota(), stub, references: (i) => referencePhotos(i.creatorPhotoRef), demoClip });
+  return new AiProvider({
+    quota: new DrizzleQuota(),
+    stub,
+    references: (i) => referencePhotos(i.creatorPhotoRef),
+    demoClip,
+    video: (i, still) => imageToVideo({ image: still.bytes, mime: still.mime, prompt: veoPrompt(i.prompt, "9:16"), aspectRatio: "9:16" }),
+  });
 }
 
 export const livePayPal: PayPalPort = { createVaultOrder, authorizeOrder, captureAuthorization, voidAuthorization, refundCapture, createPayout };
