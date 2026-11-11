@@ -25,16 +25,24 @@ declare global {
 
 const SDK = { sandbox: "https://www.sandbox.paypal.com/web-sdk/v6/core", live: "https://www.paypal.com/web-sdk/v6/core" };
 
+// One load per page: React runs effects twice in development, and a second <script> would define PayPal's custom
+// elements twice (NotSupportedError). A failed load is forgotten, so a retry loads again.
+let sdkLoad: Promise<void> | null = null;
 function loadSdk(env: "sandbox" | "live") {
-  return new Promise<void>((resolve, reject) => {
-    if (window.paypal) return resolve();
+  if (window.paypal) return Promise.resolve();
+  sdkLoad ??= new Promise<void>((resolve, reject) => {
     const s = document.createElement("script");
     s.src = SDK[env];
     s.async = true;
     s.onload = () => resolve();
-    s.onerror = () => reject(new Error("PayPal SDK failed to load"));
+    s.onerror = () => {
+      sdkLoad = null;
+      s.remove();
+      reject(new Error("PayPal SDK failed to load"));
+    };
     document.head.appendChild(s);
   });
+  return sdkLoad;
 }
 
 async function postJson<T>(url: string, body?: unknown): Promise<T> {

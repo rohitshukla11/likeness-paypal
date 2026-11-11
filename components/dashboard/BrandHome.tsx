@@ -129,7 +129,7 @@ export function BrandHome({ v, renders, notice, demoWallet, picked }: { v: View;
       <div className="grid grid-cols-1 items-start gap-[18px] lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
         <Panel tone="surface" title="Request a licence" id="request">
           {!req ? (
-            <Empty>Every creator here is already licensed or asked. Their licences are on the right.</Empty>
+            <Empty>Every creator here is already licensed or asked: see Licences.</Empty>
           ) : (
             <form key={req.id} action={requestLicence} className="flex flex-col gap-3">
               <input type="hidden" name="creatorId" value={req.id} />
