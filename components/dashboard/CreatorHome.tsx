@@ -5,19 +5,21 @@
  * FaceVisa's chain parts (Arkiv listing, Swarm files, World ID, on-chain payment lines) are replaced by PayPal ids.
  */
 import Link from "next/link";
-import { decideRequest, revokeLicence, saveTerms } from "@/app/(app)/creator/actions";
+import { decideRequest, playCreator, revokeLicence, saveTerms } from "@/app/(app)/creator/actions";
 import { LicenceReview } from "@/components/agent/LicenceReview";
 import { btnClass, StatusPill } from "@/components/ds";
 import { CREATOR_LABEL, PayPalId, renderPill, usd, when } from "@/components/dashboard/shared";
 import { chipClass, Field, fmtDay, inputClass, StatusBadge } from "@/components/ui";
 import { BANNED_USES, USES } from "@/lib/db/schema";
+import { personaOf } from "@/lib/personas";
 import type { creatorView } from "@/lib/queries";
-import { Banner, CHIP, Empty, FaceTile, Fact, MUTED, OUTLINE, OUTLINE_BAD, Panel, Rule, Stat, StatsRow, SURFACE } from "./kit";
+import { Banner, CHIP, Empty, FaceTile, Fact, MUTED, OUTLINE, OUTLINE_BAD, Panel, Rule, Stat, StatsRow, SURFACE, SyntheticBadge } from "./kit";
 
 type View = Awaited<ReturnType<typeof creatorView>>;
 
 export function CreatorHome({ v, notice, reviewEnabled, onboardingLink }: { v: View; notice?: React.ReactNode; reviewEnabled: boolean; onboardingLink: boolean }) {
-  const { creator: c, requests, licences, ledger, earned, pending } = v;
+  const { creator: c, cast, requests, licences, ledger, earned, pending } = v;
+  const persona = personaOf(c.photoRef);
   const active = licences.filter((l) => l.state === "active");
   const ads = ledger.filter((x) => x.render.outputRef);
 
@@ -25,7 +27,7 @@ export function CreatorHome({ v, notice, reviewEnabled, onboardingLink }: { v: V
     <div className="mx-auto flex w-full max-w-[1320px] flex-col gap-[18px] px-4 pb-12 pt-6 sm:px-8">
       <Banner
         label="Your creator profile"
-        visual={<FaceTile src={c.photoRef ?? "/demo/rohit.svg"} alt={`${c.name}'s reference portrait (demo illustration)`} />}
+        visual={<FaceTile src={c.photoRef ?? "/demo/rohit.svg"} alt={`${c.name}'s reference portrait (${persona?.synthetic ? "synthetic creator, illustration" : "demo illustration"})`} />}
         title={c.name}
         sub="You approve each brand once, within your terms. Every ad made under a licence is paid to your PayPal (90%) when the brand accepts it, and comes with a signed receipt."
         chips={
@@ -34,7 +36,8 @@ export function CreatorHome({ v, notice, reviewEnabled, onboardingLink }: { v: V
             <span className={`${CHIP} bg-violet-soft text-wait`} title="PayPal Payouts send your 90% here">
               Payouts to {c.payoutPaypalEmail ?? "no PayPal email yet"}
             </span>
-            {!c.googleSub && <span className={`${CHIP} bg-paper text-grey`}>Demo creator · illustrated portrait</span>}
+            {persona && <span className={`${CHIP} bg-paper text-ink`}>{persona.niche}</span>}
+            {persona?.synthetic ? <SyntheticBadge /> : !c.googleSub && <span className={`${CHIP} bg-paper text-grey`}>Demo creator · illustrated portrait</span>}
           </>
         }
         actions={
@@ -45,6 +48,35 @@ export function CreatorHome({ v, notice, reviewEnabled, onboardingLink }: { v: V
           ) : undefined
         }
       />
+
+      {cast.length > 1 && (
+        <nav className={`${SURFACE} flex flex-col gap-2 p-4 sm:flex-row sm:items-center`} aria-label="Creator you play">
+          <span className={`shrink-0 text-[13px] font-semibold ${MUTED}`}>You&apos;re playing</span>
+          <div className="flex flex-wrap gap-2">
+            {cast.map((x) => {
+              const me = x.id === c.id;
+              const synthetic = personaOf(x.photoRef)?.synthetic;
+              return (
+                <form key={x.id} action={playCreator.bind(null, x.id)}>
+                  <button
+                    type="submit"
+                    aria-current={me ? "true" : undefined}
+                    disabled={me}
+                    title={synthetic ? "Synthetic creator: fictional person, AI-generated face" : undefined}
+                    className={`inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full border px-3 text-[14px] font-semibold disabled:cursor-default ${me ? "border-ink bg-ink text-white" : "border-field bg-white text-ink hover:border-ink"}`}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={x.photoRef ?? "/demo/rohit.svg"} alt="" width={28} height={28} className="h-7 w-7 rounded-full object-cover object-top" />
+                    {x.name}
+                    {synthetic && <span className={`text-[11px] font-semibold ${me ? "text-grey-dark" : MUTED}`}>synthetic</span>}
+                    {x.waiting > 0 && <span className="rounded-full bg-lime px-2 text-[12px] text-ink">{x.waiting}</span>}
+                  </button>
+                </form>
+              );
+            })}
+          </div>
+        </nav>
+      )}
 
       {notice}
 
@@ -104,7 +136,7 @@ export function CreatorHome({ v, notice, reviewEnabled, onboardingLink }: { v: V
                   <Fact label="Renders" value={`${l.rendersUsed} of ${l.renderCap}`} />
                   <Fact label={l.state === "revoked" ? "Revoked" : "Until"} value={fmtDay(l.state === "revoked" ? l.revokedAt : l.expiresAt)} />
                 </dl>
-                <span className={`text-[13px] ${MUTED}`}>{usd(l.pricePerRenderCents)} per image · video 3×</span>
+                <span className={`text-[13px] ${MUTED}`}>{usd(l.pricePerRenderCents)} per image · {l.videoMultiplier > 0 ? `video ${l.videoMultiplier}×` : "images only"}</span>
                 {(l.state === "active" || l.state === "exhausted" || l.state === "expired") && (
                   <form action={revokeLicence.bind(null, l.id)} className="mt-auto">
                     <button className={OUTLINE_BAD}>Revoke</button>
@@ -205,13 +237,13 @@ export function CreatorHome({ v, notice, reviewEnabled, onboardingLink }: { v: V
         <Panel tone="surface" title="Your rules">
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             <Rule label="Per image" value={usd(c.pricePerRenderCents)} />
-            <Rule label="Per video" value={usd(c.pricePerRenderCents * c.videoMultiplier)} />
+            <Rule label="Per video" value={c.videoMultiplier > 0 ? usd(c.pricePerRenderCents * c.videoMultiplier) : "Images only"} />
             <Rule label="Renders" value={`up to ${c.maxRendersPerLicence}`} />
             <Rule label="Longest licence" value={`${c.maxDays} days`} />
           </div>
           <form action={saveTerms} className="flex flex-col gap-3">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Field label="Price per render (USD)" hint="Video costs 3× this">
+              <Field label="Price per render (USD)" hint={c.videoMultiplier > 0 ? `Video costs ${c.videoMultiplier}× this` : "Images only: you don't allow video"}>
                 <input name="price" type="number" min="0.5" max="100" step="0.01" defaultValue={(c.pricePerRenderCents / 100).toFixed(2)} className={inputClass} />
               </Field>
               <Field label="Renders per licence">

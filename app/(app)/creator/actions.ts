@@ -1,13 +1,13 @@
 "use server";
 /** The creator's actions: terms, payout email, approve/decline requests, revoke licences. */
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { creators, USES } from "@/lib/db/schema";
 import { HttpError } from "@/lib/errors";
 import { decide, revoke } from "@/lib/licences";
-import { getSession } from "@/lib/session";
+import { getSession, setPlayedCreator } from "@/lib/session";
 
 async function me() {
   const s = await getSession();
@@ -36,6 +36,19 @@ export async function saveTerms(form: FormData) {
     .where(eq(creators.id, s.creatorId));
   revalidatePath("/creator");
   back({ ok: "Terms saved. New requests use them; approved licences keep the price they were approved at." });
+}
+
+/** Play another of this workspace's creators (Rohit or a synthetic creator). */
+export async function playCreator(creatorId: string) {
+  const s = await me();
+  const [c] = await db()
+    .select({ id: creators.id, name: creators.name })
+    .from(creators)
+    .where(and(eq(creators.id, creatorId), eq(creators.workspaceId, s.id), eq(creators.status, "live")));
+  if (!c) back({ error: "That creator isn't in your demo workspace" });
+  await setPlayedCreator(c.id);
+  revalidatePath("/creator");
+  back({ ok: `You're playing ${c.name} now.` });
 }
 
 export async function decideRequest(licenceId: string, approve: boolean) {

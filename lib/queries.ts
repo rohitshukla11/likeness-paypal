@@ -23,7 +23,22 @@ export async function creatorView(creatorId: string) {
     .limit(100);
   const earned = ledger.filter((l) => l.render.status === "accepted").reduce((s, l) => s + l.render.creatorPayoutCents, 0);
   const pending = ledger.filter((l) => ["in_review", "settling"].includes(l.render.status)).reduce((s, l) => s + Math.floor((l.render.amountCents * 90) / 100), 0);
+  // The workspace's live creators the visitor can play (the Creator page's switcher), with their waiting requests.
+  const cast = creator?.workspaceId
+    ? await db()
+        .select({ id: creators.id, name: creators.name, photoRef: creators.photoRef })
+        .from(creators)
+        .where(and(eq(creators.workspaceId, creator.workspaceId), eq(creators.status, "live")))
+        .orderBy(creators.createdAt, creators.id)
+    : [];
+  const waiting = cast.length
+    ? await db()
+        .select({ creatorId: licences.creatorId })
+        .from(licences)
+        .where(and(inArray(licences.creatorId, cast.map((x) => x.id)), eq(licences.status, "pending")))
+    : [];
   return {
+    cast: cast.map((x) => ({ ...x, waiting: waiting.filter((w) => w.creatorId === x.id).length })),
     creator,
     requests: all.filter((l) => l.state === "pending"),
     licences: all.filter((l) => l.state !== "pending"),
@@ -59,7 +74,7 @@ export async function brandView(brandId: string) {
 /** The brand's renders, newest first, with the latest refusal reason and the receipt id. */
 export async function brandRenders(brandId: string, limit = 30) {
   const rows = await db()
-    .select({ render: renders, receiptId: receipts.id, receiptStatus: receipts.status, creatorName: creators.name })
+    .select({ render: renders, receiptId: receipts.id, receiptStatus: receipts.status, creatorName: creators.name, creatorPhoto: creators.photoRef })
     .from(renders)
     .innerJoin(licences, eq(licences.id, renders.licenceId))
     .innerJoin(creators, eq(creators.id, licences.creatorId))

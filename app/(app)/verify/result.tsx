@@ -2,7 +2,9 @@
 import type { ReactNode } from "react";
 import { Card, CreatorFace, StatusPill, type PillKind } from "@/components/ds";
 import { IconCheck, IconCross, IconQuestion, IconShield } from "@/components/ds/icons";
+import { SyntheticBadge } from "@/components/dashboard/kit";
 import { PayPalId } from "@/components/dashboard/shared";
+import { isSynthetic } from "@/lib/personas";
 import type { VerifyResult } from "@/lib/verify";
 
 const LOOK: Record<VerifyResult["verdict"], { pill: PillKind; card: string; mark: ReactNode; stamp: string }> = {
@@ -43,6 +45,7 @@ export function Result({ result: v }: { result: VerifyResult }) {
               <div className="min-w-0">
                 <p className="m-0 text-[13px] text-grey">Creator</p>
                 <p className="m-0 truncate font-semibold">{v.creator?.name ?? "–"}</p>
+                {isSynthetic(v.creator?.photoRef) && <SyntheticBadge className="mt-1" />}
               </div>
             </div>
             <div className="min-w-0 rounded-[18px] bg-white px-[18px] py-4">

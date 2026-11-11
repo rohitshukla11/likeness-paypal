@@ -5,11 +5,11 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { canonicalJson, sha256Hex } from "@/lib/canonical";
 import { db } from "@/lib/db";
-import { brands, mandates } from "@/lib/db/schema";
+import { brands, creators, mandates } from "@/lib/db/schema";
 import { HttpError, newId } from "@/lib/errors";
 import { fileRequest } from "@/lib/licences";
 import { PayPalError } from "@/lib/paypal/http";
-import { getSession } from "@/lib/session";
+import { getSession, setPlayedCreator } from "@/lib/session";
 import { attachSharedDemoWallet } from "@/lib/wallet";
 
 async function me() {
@@ -53,18 +53,23 @@ export async function saveMandate(form: FormData) {
 
 export async function requestLicence(form: FormData) {
   const s = await me();
+  let to = "the creator";
   try {
-    await fileRequest(s.brandId, {
+    const l = await fileRequest(s.brandId, {
       creatorId: String(form.get("creatorId")),
       uses: form.getAll("uses").map(String),
       days: Number(form.get("days")),
       renderCap: Number(form.get("renderCap")),
       brief: String(form.get("brief") ?? ""),
     });
+    // Continue as Creator now plays the creator who was asked, so their request is waiting there.
+    await setPlayedCreator(l.creatorId);
+    const [c] = await db().select({ name: creators.name }).from(creators).where(eq(creators.id, l.creatorId));
+    if (c) to = c.name;
   } catch (e) {
     back({ error: e instanceof HttpError ? e.message : "Could not send the request" });
   }
-  back({ ok: "Request sent. Switch to the Creator persona to approve it." });
+  back({ ok: `Request sent to ${to}. Switch to Creator (you'll be playing ${to}) to review and approve it.` });
 }
 
 /** Attach the shared sandbox demo wallet instead of saving one at PayPal. */

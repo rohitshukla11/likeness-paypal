@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { BrandAgent } from "@/components/agent/BrandAgent";
 import { btnClass } from "@/components/ds";
-import { Banner, Empty, Fact, Monogram, OUTLINE, Panel, Stat, StatsRow, SURFACE } from "@/components/dashboard/kit";
+import { Banner, Empty, Fact, Monogram, OUTLINE, Panel, Stat, StatsRow, SURFACE, SyntheticBadge } from "@/components/dashboard/kit";
+import { isSynthetic } from "@/lib/personas";
 import { geminiConfigured } from "@/lib/ai/gemini";
 import { RenderCard } from "@/components/dashboard/RenderCard";
 import { usd } from "@/components/dashboard/shared";
@@ -70,8 +71,9 @@ async function Studio({ searchParams }: PageProps<"/brand/studio">) {
             <Empty>No ads yet. Ask the agent or use the form: each ad shows up here with its PayPal order, capture and payout or refund.</Empty>
           ) : (
             <div className="flex flex-col gap-3">
-              {renders.map(({ render: r, receiptId, creatorName, refusal }) => (
-                <div key={r.id} className={`${SURFACE} p-2`}>
+              {renders.map(({ render: r, receiptId, creatorName, creatorPhoto, refusal }) => (
+                <div key={r.id} className={`${SURFACE} flex flex-col gap-2 p-2`}>
+                  {isSynthetic(creatorPhoto) && <SyntheticBadge className="mx-2 mt-1" />}
                   <RenderCard
                     r={r}
                     mode="brand"
@@ -134,7 +136,9 @@ async function Studio({ searchParams }: PageProps<"/brand/studio">) {
                   .flatMap((l) =>
                     l.allowedUses.map((u) => (
                       <option key={`${l.id}|${u}`} value={`${l.id}|${u}`}>
-                        {l.creatorName} · {u} · {l.state} · {l.rendersUsed}/{l.renderCap}
+                        {l.creatorName}
+                        {isSynthetic(l.creatorPhoto) ? " (synthetic creator)" : ""} · {u} · {l.state} · {l.rendersUsed}/{l.renderCap}
+                        {l.videoMultiplier > 0 ? "" : " · images only"}
                       </option>
                     )),
                   )}
