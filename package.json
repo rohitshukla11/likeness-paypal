@@ -15,7 +15,8 @@
     "db:migrate": "drizzle-kit migrate",
     "test": "tsx --conditions=react-server --test --test-reporter=spec tests/*.test.ts",
     "e2e:engine": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/engine-e2e.ts",
-    "face:models": "sh scripts/face-models.sh"
+    "face:models": "sh scripts/face-models.sh",
+    "ai:once": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/ai-render-once.ts"
   },
   "dependencies": {
     "@contentauth/c2pa-node": "0.9.9",
