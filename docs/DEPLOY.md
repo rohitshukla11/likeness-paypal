@@ -37,7 +37,7 @@ Neon Postgres. Nothing is stored on Render's disk, which is ephemeral.
 | `APP_BASE_URL` | `https://likeness-r2t7.onrender.com` (the live service; Render added the `-r2t7` suffix because `likeness` was taken) | PayPal return URLs, receipts, C2PA |
 | `DATABASE_URL` | secret | the Neon connection string (same as local) |
 | `RECEIPT_SIGNING_KEY` | secret, **the SAME as local** | receipts signed locally must keep verifying |
-| `PHOTO_KEK` | secret, **the SAME as local** | opens the sealed reference photo from `seed:assets` |
+| `PHOTO_KEK` | secret, **the SAME as local** | opens the sealed reference photos from `seed:assets` (Rohit, Maya, Theo) |
 | `E2E_TOKEN` | secret, the same as local | enables `POST /api/e2e` for `pnpm e2e:live`; remove it to switch the endpoint off |
 | `CRON_SECRET` | secret, optional | protects `GET /api/cron/settle` |
 | `REVIEW_WINDOW_SECONDS` | `120` | |
@@ -48,6 +48,7 @@ Neon Postgres. Nothing is stored on Render's disk, which is ephemeral.
 | `VIDEO_SECONDS`, `VIDEO_TIMEOUT_MS` | `8`, `300000` | 8 s clips at 16:9 (about $0.61 each) |
 | `C2PA_CERT_PEM`, `C2PA_KEY_PEM` | secret | the test chain from `private/c2pa`, newlines escaped as `\n` (see below); without them renders carry no manifest |
 | `AGENT_MODEL` | `gemini-3.5-flash-lite` | the brand and creator agents |
+| `GEMINI_IMAGE_MODEL`, `GEMINI_VIDEO_MODEL`, `GEMINI_FILTER_MODEL` | not set | the code's defaults are used: `gemini-nano-banana-2.1` (images and a video's opening still), `gemini-omni-1.2-flash` (video), `gemini-3.5-flash-lite` (prompt filter, face check, vision compliance) |
 | `AGENT_TURNS_PER_WORKSPACE`, `AGENT_TURNS_DAILY` | `20`, `400` | agent turns per demo workspace, and across the demo per UTC day (atomic counters in `ai_quota`) |
 | `FEATURE_CREATOR_ONBOARDING` | `false` | onboarding stays off: no Google OAuth client, no face models on the server |
 

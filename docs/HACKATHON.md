@@ -1,6 +1,6 @@
 # PayPal AI Hackathon: what's new and what's reused
 
-## New since 1 Oct 2026
+## New since 1 Oct 2026 (built for this hackathon)
 
 Everything in this repository is new work unless it is listed under "Reused code" below.
 
@@ -15,7 +15,26 @@ Everything in this repository is new work unless it is listed under "Reused code
 - The UI: the landing page, the Brand page (mandate, licence request, Save PayPal wallet with JS SDK v6), the Studio,
   the Creator page and Verify. The demo images in `public/demo/` were drawn for this project as SVG.
 - `tests/` (unit tests) and `scripts/engine-e2e.ts` (the engine against the PayPal sandbox).
-- `docs/DEPLOY.md`: research on Render Workflows.
+- `docs/DEPLOY.md`: the Render deploy (`render.yaml` Blueprint, Neon, secrets, a manual deploy) and research on
+  Render Workflows.
+- PayPal webhooks (`app/api/paypal/webhook/route.ts`, `lib/paypal/webhooks.ts`): every event is verified with
+  `verify-webhook-signature` before it is acted on (captures, refunds, payouts, vault tokens).
+- Receipts with PayPal ids: each Ed25519-signed receipt names the render, its licence, and the PayPal order,
+  authorization, capture, payout or refund ids; checked on `/verify` and with the public key.
+- The demo wallet ("Use demo wallet", `lib/wallet.ts`): a shared sandbox Vault payment token, so judges need no PayPal
+  login; and the JS SDK v6 save flow for any sandbox account.
+- The AI caps (`lib/ai/quota.ts`, `lib/ai/quota-store.ts`): atomic counters in Postgres, reserved in one place for
+  images, regenerations and videos; the agent turn caps; and the plain-words stand-in reasons (`lib/engine/stand-in.ts`).
+- The demo workspaces (`lib/demo.ts`, `lib/session.ts`): a private set of rows per visitor; the seeded creators
+  (`lib/personas.ts`: Rohit, and the synthetic creators Maya and Theo, fictional people with AI-generated faces,
+  paid out to the demo's shared sandbox account; Theo images only, enforced by the policy) and the creator switcher.
+- The creator search on the Brand page and the agent's `list_creators` (`lib/creator-browse.ts`), and the agent's
+  video prompt.
+- Image-only licences (a video multiplier of 0, refused before any PayPal call) and the
+  `video_not_allowed` refusal.
+- The gated scripts: `pnpm ai:once` (one real render, dry run unless `--confirm`), `pnpm portraits:synthetic`,
+  `pnpm seed:assets` (sealed assets in Neon), `pnpm e2e:live` (the deployed engine against the sandbox).
+- Performance: parallel reads, a warm connection pool, preloaded portraits.
 - Agents and compliance (new, not reused): the brand agent (`lib/agent/brand.ts`, a Gemini tool-calling loop with the PayPal Agent Toolkit's `list_transactions` and `get_order` and this app's own tools, streaming every engine step), the creator agent's licence review (`lib/agent/creator.ts`), the prompt check before payment (`lib/ai/precheck.ts`) and the Gemini vision check after render (`lib/ai/vision.ts`).
 
 ## Reused code

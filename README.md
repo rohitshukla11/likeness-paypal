@@ -1,6 +1,12 @@
 # Likeness × PayPal
 
+▶ Demo video (under 3 min): https://youtu.be/UyZJwdKjMro
+
+Live: https://likeness-r2t7.onrender.com
+
 ## For judges
+
+**Demo video (under 3 min):** https://youtu.be/UyZJwdKjMro
 
 **Live (PayPal sandbox):** https://likeness-r2t7.onrender.com. No sign-up: each visitor gets a private demo workspace,
 with a creator (Rohit) who has already approved one licence for the demo brand. For a fresh workspace, open the site
@@ -68,8 +74,9 @@ then adapted in a separate commit.
   face check, regenerated once on a mismatch), at most 10 a day across the live demo and 3 per workspace (a
   regeneration takes one more).
 - **AI videos:** 8 s at 16:9, Gemini Omni Flash animating the video's own opening still, at most 5 in total.
-- **Over a cap:** a labelled pre-made demo image or the saved demo clip stands in, and no AI call is made.
-- **Agent:** 20 turns per workspace and a daily cap across the demo.
+- **Over a cap:** a pre-made demo image or the saved demo clip stands in, and no AI call is made. The card says why,
+  for example "AI image cap reached today (10/day): showing a demo stand-in. The PayPal payment is real (sandbox)."
+- **Agent:** `gemini-3.5-flash-lite`, 20 turns per workspace and 400 a day across the demo.
 - **Never charged:** refused prompts, licences or mandates are never charged. A render that fails its vision check
   has its authorization voided.
 
@@ -100,21 +107,24 @@ Then the creator is paid 90% through PayPal Payouts when the brand accepts the a
 
 - **Working end to end in the PayPal sandbox:** the render engine, the Brand, Studio, Creator and Verify pages, and
   signed receipts.
-- **Renders:** the StubProvider (pre-generated demo images, no cost) by default. With `RENDER_PROVIDER=gemini` and
-  `GEMINI_API_KEY`, the AI provider makes real ads on the **Gemini API** (never Vertex AI); see "AI ads" below.
+- **Renders:** the live demo runs `RENDER_PROVIDER=eth` (`render.yaml`): real AI images and 8 s 16:9 videos on the
+  **Gemini API** (never Vertex AI), within the caps; see "AI ads" below. Without `RENDER_PROVIDER` (a local default)
+  the StubProvider shows labelled demo stand-ins at no cost; `RENDER_PROVIDER=gemini` is the earlier AI provider.
 - **Content credentials (C2PA):** AI images and videos are signed with a locally made TEST certificate
   (`sh scripts/c2pa-testcert.sh`). No cloud project is involved, so this was ported. The test signer is reported
   untrusted, which is expected.
-- **Creator onboarding:** built, but behind `FEATURE_CREATOR_ONBOARDING` (off). The seeded demo personas are the
-  default.
+- **Creator onboarding:** built, but behind a flag, off (`FEATURE_CREATOR_ONBOARDING=false`): no Google sign-in
+  anywhere, and `/creator/onboard` is a 404. The seeded demo creators are the default.
 
 ## AI ads
 
 | What | Model (Gemini API) | Caps | Over the cap |
 |---|---|---|---|
 | Image ads, from the creator's reference photo (likeness-eth's prompt rules and face check on the live demo) | `gemini-nano-banana-2.1`, 1K (about $0.048 per image, one more on a regeneration) | `RENDER_CAP_DAILY` per UTC day (10 on the live demo, 30 by default), `RENDER_CAP_PER_WORKSPACE`=3 | the labelled demo image stands in, and no AI call is made |
-| Video ads, priced at the licence's video multiplier (3× for Rohit, none for Theo): on the live demo (`eth`) the video makes its own 16:9 opening still from the reference photo; with `gemini` it starts from one of the brand's generated ad images | `gemini-omni-1.2-flash`, 8 s at 720p and 16:9 on the live demo (`VIDEO_SECONDS`), task `image_to_video` (about $0.61 with its still; 4 s with `gemini`, about $0.28) | `VIDEO_CAP_TOTAL`=5 in total on the live demo (3 by default) | the saved clip `private/demo-video.mp4` plays, labelled "demo render" |
-| Prompt safety filter, run before every AI render | `gemini-3.5-flash-lite`, plus local banned-use rules; fails closed | – | – |
+| Video ads, priced at the licence's video multiplier (3× for Rohit, none for Theo): on the live demo (`eth`) the video makes its own 16:9 opening still from the reference photo; with `gemini` it starts from one of the brand's generated ad images | `gemini-omni-1.2-flash`, 8 s at 720p and 16:9 on the live demo (`VIDEO_SECONDS`), task `image_to_video` (about $0.61 with its still; 4 s with `gemini`, about $0.28) | `VIDEO_CAP_TOTAL`=5 in total on the live demo (3 by default) | the saved demo clip (`asset:demo-video`, an earlier 8 s eth render) plays, with "AI video cap reached (5 in total): playing the saved demo clip. The PayPal payment is real (sandbox)." |
+| Prompt safety filter, run before every AI render (before any PayPal call) | `gemini-3.5-flash-lite`, plus local banned-use rules; fails closed | – | – |
+| Face check (eth: one regeneration on a mismatch) and the vision compliance check after render, before capture | `gemini-3.5-flash-lite` | a regeneration takes an image slot | a failed check voids the authorization |
+| The brand agent and the creator's licence review | `gemini-3.5-flash-lite` (`AGENT_MODEL`) | `AGENT_TURNS_PER_WORKSPACE`=20, `AGENT_TURNS_DAILY`=400 | the agent says it reached its limit; the Studio form still works |
 
 - **Video model:** video uses **Gemini Omni Flash**, not Veo. Veo's previews on the Gemini API were shut down on
   2026-10-22, and Veo GA is only on Google's enterprise platform (Vertex), which this app doesn't use.
