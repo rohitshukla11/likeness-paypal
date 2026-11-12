@@ -70,9 +70,8 @@ then adapted in a separate commit.
 
 **Caps and fallbacks**
 
-- **AI images:** `gemini-nano-banana-2.1` with likeness-eth's pipeline (`RENDER_PROVIDER=eth`: its prompt rules and a
-  face check, regenerated once on a mismatch), at most 10 a day across the live demo and 3 per workspace (a
-  regeneration takes one more).
+- **AI images:** `gemini-nano-banana-2.1` with a face check (regenerated once on a mismatch), at most 10 a day across
+  the live demo and 3 per workspace (a regeneration takes one more).
 - **AI videos:** 8 s at 16:9, Gemini Omni Flash animating the video's own opening still, at most 5 in total.
 - **Over a cap:** a pre-made demo image or the saved demo clip stands in, and no AI call is made. The card says why,
   for example "AI image cap reached today (10/day): showing a demo stand-in. The PayPal payment is real (sandbox)."

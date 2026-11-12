@@ -42,7 +42,6 @@ Neon Postgres. Nothing is stored on Render's disk, which is ephemeral.
 | `CRON_SECRET` | secret, optional | protects `GET /api/cron/settle` |
 | `REVIEW_WINDOW_SECONDS` | `120` | |
 | `SETTLE_LOOP_SECONDS` | `30` | the in-process settle loop (`instrumentation.ts`); `0` turns it off |
-| `RENDER_PROVIDER` | `eth` | likeness-eth's pipeline on the Gemini API (face check with one regeneration, videos from their own 16:9 opening still) within the caps; `gemini` switches back; `stub` for no AI calls at all |
 | `GEMINI_API_KEY` | secret | the Gemini API key (new project) |
 | `RENDER_CAP_DAILY`, `RENDER_CAP_PER_WORKSPACE`, `VIDEO_CAP_TOTAL` | `10`, `3`, `5` (the code's defaults are 30, 3 and 3; the deploy uses 10, 3 and 5) | atomic counters in Neon (`ai_quota`), shared with local runs and `pnpm ai:once`, all reserved in one place (`reserveAi`, lib/ai/quota.ts) |
 | `VIDEO_SECONDS`, `VIDEO_TIMEOUT_MS` | `8`, `300000` | 8 s clips at 16:9 (about $0.61 each) |
