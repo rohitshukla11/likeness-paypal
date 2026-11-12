@@ -140,28 +140,7 @@ Then the creator is paid 90% through PayPal Payouts when the brand accepts the a
   portraits are `private/maya.jpg` and `private/theo.jpg` (AI-generated faces of fictional people, made by
   `pnpm portraits:synthetic`, a dry run unless `--confirm`); `pnpm seed:assets` seals all three into the database.
 - **One gated render:** `pnpm ai:once --kind image|video` makes exactly one render through the whole engine. It runs
-  only with `--confirm`, and is a dry run otherwise. Add `--provider eth` for the likeness-eth pipeline (below).
-
-### The likeness-eth pipeline (`RENDER_PROVIDER=eth`)
-
-likeness-eth's way of making ads, on the same Gemini API models (`lib/ai/eth.ts`). The live demo uses it
-(`render.yaml`); `RENDER_PROVIDER=gemini` switches back.
-
-- **Prompts:** likeness-eth's templates (`lib/ai/eth-prompts.ts`): the brief, then the rules that keep the creator
-  faithful, including never copying the reference photo's clothing, accessories or straight-on pose. The Studio shows
-  the exact prompt before the brand presses Render.
-- **Face check:** the generated still is compared with the creator's reference photo (`gemini-3.5-flash-lite`); on a
-  mismatch it is regenerated once, which takes one more slot in the image caps. A second mismatch, or no slot left,
-  fails the render and the PayPal authorization is voided.
-- **Video:** it makes its own 16:9 opening still from the reference photo (part of the video: covered by the video's
-  price and its video slot, with no separate PayPal charge), then Gemini Omni Flash animates it for `VIDEO_SECONDS`
-  (8) at 16:9. likeness-eth used Veo 3.1 Lite on Vertex AI; Veo isn't on the Gemini API, so Omni Flash stands in.
-- **Label:** images carry "AI-generated · licensed likeness" in their pixels; every video player shows it as a fixed
-  overlay (no ffmpeg re-encoding), and it is in the receipt and the content credential.
-- **Cost (Gemini API, measured 2026-11-11 from reported tokens):** about $0.048 per image (one more on a
-  regeneration), about $0.61 per 8 s video with its opening still.
-- **Unchanged:** the prompt check before payment, authorize, render, vision compliance, capture or void; the caps and
-  the demo stand-ins over them; C2PA; sealed reference photos from Neon; per-creator rules (Theo: images only).
+  only with `--confirm`, and is a dry run otherwise. Add `--provider eth` for the likeness-eth pipeline.
 
 ## How payments work
 
