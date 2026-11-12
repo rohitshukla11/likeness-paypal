@@ -25,7 +25,13 @@ const LABEL: Record<string, string> = {
   receipt: "Receipt",
 };
 const TOOL: Record<string, string> = { make_ad: "Making the ad", get_status: "Reading your wallet, mandate and licences", spend_summary: "Adding up your spend", list_transactions: "PayPal Agent Toolkit: list_transactions", get_order: "PayPal Agent Toolkit: get_order" };
-const EXAMPLES = ["Make a 9:16 café ad with Rohit", "Make another one", "What did I spend this week?", "Show me PayPal's record for my last ad"];
+const EXAMPLES = [
+  "Make a 9:16 café ad with Rohit",
+  "Make a video ad of Rohit jogging by the sea with our cold brew",
+  "Make another one",
+  "What did I spend this week?",
+  "Show me PayPal's record for my last ad",
+];
 
 const short = (id: string) => (id.length <= 14 ? id : `${id.slice(0, 6)}…${id.slice(-4)}`);
 

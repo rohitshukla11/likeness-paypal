@@ -27,6 +27,8 @@ export function CreatorBrowse({ cards, studioHref = "/brand/studio" }: { cards: 
   const [f, setF] = useState<CreatorFilter>({});
   // The name search applies on Search (or Enter), like a search box; the dropdowns apply at once.
   const [draft, setDraft] = useState("");
+  // No cards until the brand presses Search (with or without a name); then the filters update the results in place.
+  const [searched, setSearched] = useState(false);
   const set = (patch: Partial<CreatorFilter>) => setF((x) => ({ ...x, ...patch }));
   const shown = useMemo(() => filterCreators(cards, f), [cards, f]);
   const niches = useMemo(() => [...new Set(cards.map((c) => c.niche))].sort(), [cards]);
@@ -56,6 +58,7 @@ export function CreatorBrowse({ cards, studioHref = "/brand/studio" }: { cards: 
           onSubmit={(e) => {
             e.preventDefault();
             set({ q: draft.trim() || undefined });
+            setSearched(true);
           }}
           aria-label="Search creators"
         >
@@ -108,10 +111,8 @@ export function CreatorBrowse({ cards, studioHref = "/brand/studio" }: { cards: 
           />
         </form>
         <div className="flex flex-wrap items-center justify-between gap-2 text-[13px]" aria-live="polite">
-          <span className={MUTED}>
-            Showing {shown.length} of {cards.length}
-          </span>
-          {filtered && (
+          <span className={MUTED}>{searched ? `Showing ${shown.length} of ${cards.length}` : `${cards.length} creators: press Search to list them (leave the name empty for all)`}</span>
+          {searched && filtered && (
             <button
               type="button"
               onClick={() => {
@@ -125,7 +126,7 @@ export function CreatorBrowse({ cards, studioHref = "/brand/studio" }: { cards: 
         </div>
       </div>
 
-      {shown.length ? (
+      {!searched ? null : shown.length ? (
         <ul className="m-0 grid list-none grid-cols-1 gap-3 p-0 sm:grid-cols-2 lg:grid-cols-3">
           {shown.map((c) => (
             <li key={c.id} className={`${SURFACE} flex min-w-0 flex-col overflow-hidden`}>
