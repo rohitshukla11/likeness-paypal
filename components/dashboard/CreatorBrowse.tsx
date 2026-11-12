@@ -47,7 +47,7 @@ export function CreatorBrowse({ cards, studioHref = "/brand/studio" }: { cards: 
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <span className={`${CHIP} bg-lime text-ink`}>{cards.length} creators</span>
+            <span className={`${CHIP} bg-lime text-ink`}>{cards.length} {cards.length === 1 ? "creator" : "creators"}</span>
             <span className={`${CHIP} bg-violet-soft text-wait`}>{licensed} licensed</span>
           </div>
         </div>
@@ -111,7 +111,7 @@ export function CreatorBrowse({ cards, studioHref = "/brand/studio" }: { cards: 
           />
         </form>
         <div className="flex flex-wrap items-center justify-between gap-2 text-[13px]" aria-live="polite">
-          <span className={MUTED}>{searched ? `Showing ${shown.length} of ${cards.length}` : `${cards.length} creators: press Search to list them (leave the name empty for all)`}</span>
+          <span className={MUTED}>{searched ? `Showing ${shown.length} of ${cards.length}` : `${cards.length} ${cards.length === 1 ? "creator" : "creators"}: press Search to list ${cards.length === 1 ? "it" : "them"} (leave the name empty for all)`}</span>
           {searched && filtered && (
             <button
               type="button"
